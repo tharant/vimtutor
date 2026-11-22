@@ -44,8 +44,13 @@ The log lives in `agentlog/` and is committed to the repo.
   output); the `.md` files are the reviewable rendition, with tool outputs
   capped (`AGENTLOG_MD_MAX`, default 3000 chars; `0` disables).
 - Sessions include subagent sessions (children), listed in the log index.
-- The log is **verbatim**: do not paste secrets, tokens, or credentials
-  into a session — they will be committed verbatim by this tool.
+- The log is **verbatim** modulo redaction: personal/system strings are
+  scrubbed at write time by the exporter through the **local, gitignored
+  `.agentlog-redactions` map** (format and template in
+  `.agentlog-redactions.example`), and token/cost usage stats are hidden by
+  default (`AGENTLOG_HIDE_USAGE=0` to show). Never paste secrets, tokens or
+  credentials into a session; do not commit the map -- if outputs reveal a
+  new personal pattern, extend the map and regenerate.
 - If a session was compacted or reverted in opencode, the regenerated log
   reflects the stored transcript state; stale artifacts for sessions that
   no longer exist server-side are removed by the script.

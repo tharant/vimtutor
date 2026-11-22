@@ -9,8 +9,10 @@ user prompts, model reasoning, and every tool call with its input/output. Genera
 
 Per session you get a readable `.md` (tool outputs capped at `AGENTLOG_MD_MAX`, default 3000 chars) and a `.jsonl` sibling with full fidelity (cap the JSONL itself with `AGENTLOG_JSONL_MAX`, default: no cap). Output is incremental: unchanged transcripts produce identical files; growth is append-mostly (stable exceptions: the JSONL meta line with live session totals, the last assistant message of an in-progress turn, and this index's stats).
 
+Personal/system strings are scrubbed at write time through the LOCAL redaction map (`.agentlog-redactions`, gitignored -- see `.agentlog-redactions.example` for the format), and usage stats (tokens/cost) default to being hidden (`AGENTLOG_HIDE_USAGE=1`).
+
 The log is verbatim -- never paste secrets in a session that this tool will commit.
 
 | session | title | started | messages | directory |
 |---|---|---|---|---|
-| [`ses_dff4e8451ffeSQb4JyFpOXKUCa`](sessions/ses_dff4e8451ffeSQb4JyFpOXKUCa.md) | Modern vimtutor with neovim support | 2026-11-22 00:39:21Z | 167 |  ~/development/personal/vimtutor |
+| [`ses_dff4e8451ffeSQb4JyFpOXKUCa`](sessions/ses_dff4e8451ffeSQb4JyFpOXKUCa.md) | Modern vimtutor with neovim support | 2026-11-22 00:39:21Z | 193 |  ~/development/personal/vimtutor |

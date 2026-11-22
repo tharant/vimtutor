@@ -31,15 +31,28 @@ this tool.
 
 Usage:
     scripts/export-agent-log [--output DIR] [--project DIR] [--quiet]
+    scripts/export-agent-log --apply-redactions <MAPFILE> <FILE>...
+
+Redaction: when a redaction map exists (see .agentlog-redactions.example),
+it is applied to every rendered artifact at write time. The map is a
+LOCAL, gitignored file -- the repo ships the mechanism and an example,
+never your actual personal patterns. Used by the pre-commit hook so the
+committed log contains no personal/system strings, and usable directly
+for scrubbing arbitrary files (e.g. re-scrubbing history).
+
 Env:
-    AGENTLOG_MD_MAX    cap per fenced block in .md rendering (0 = no cap;
-                       default 3000; full text always stays in .jsonl)
-    AGENTLOG_JSONL_MAX cap per message JSON line in bytes (0 = full;
-                       default 0)
+    AGENTLOG_MD_MAX      cap per fenced block in .md rendering (0 = no cap;
+                         default 3000; full text always stays in .jsonl)
+    AGENTLOG_JSONL_MAX   cap per message JSON line in bytes (0 = full;
+                         default 0)
+    AGENTLOG_HIDE_USAGE  1 (default) omits token/cost usage stats from the
+                         .md and nulls them in .jsonl; 0 keeps them.
+    AGENTLOG_REDACTIONS  path to the map (default: repo .agentlog-redactions)
 """
 
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -50,6 +63,7 @@ GENERATOR = "scripts/export-agent-log"
 DEFAULT_OUT = "agentlog"
 DEFAULT_MD_MAX = 3000
 DEFAULT_JSONL_MAX = 0
+REDACTIONS_NAME = ".agentlog-redactions"
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -89,6 +103,68 @@ def iso(ms):
     return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).strftime(
         "%Y-%m-%d %H:%M:%SZ"
     )
+
+
+# ----------------------------------------------------------------------------
+# redaction (personal strings never leave the machine)
+# ----------------------------------------------------------------------------
+
+def load_redactions(path):
+    """Parse `REGEX :: REPLACEMENT` lines ('#' comments). Returns
+    [(compiled_regex, replacement), ...] in file order."""
+    rules = []
+    if not path or not os.path.isfile(path):
+        return rules
+    with open(path, encoding="utf-8") as fh:
+        for lineno, raw in enumerate(fh, 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "::" not in line:
+                log(f"{os.path.basename(path)}:{lineno}: missing ' :: ' "
+                    "separator, line ignored")
+                continue
+            pattern, repl = line.split("::", 1)
+            try:
+                rules.append((re.compile(pattern.strip()), repl.rstrip("\n")))
+            except re.error as exc:
+                log(f"{os.path.basename(path)}:{lineno}: bad pattern "
+                    f"({exc}); line ignored")
+    return rules
+
+
+def scrubber(rules):
+    """Factory: returns scrub(text) applying all rules in order."""
+    def scrub(text):
+        if not isinstance(text, str) or not rules:
+            return text
+        for pattern, repl in rules:
+            text = pattern.sub(repl, text)
+        return text
+    return scrub
+
+
+def find_redactions(repo_root):
+    for cand in (
+        os.environ.get("AGENTLOG_REDACTIONS"),
+        os.path.join(repo_root, REDACTIONS_NAME),
+    ):
+        if cand and os.path.isfile(cand):
+            return cand
+    return ""
+
+
+def scrub_usage(payload):
+    """AGENTLOG_HIDE_USAGE=1: null token/cost fields inside the verbatim
+    JSON payload (session info + per message)."""
+    info = payload.get("info") or {}
+    info["cost"] = None
+    info["tokens"] = None
+    for msg in payload.get("messages") or []:
+        if msg.get("type") == "assistant":
+            msg["cost"] = None
+            msg["tokens"] = None
+    return payload
 
 
 # ----------------------------------------------------------------------------
@@ -338,7 +414,6 @@ def info_location(info, fallback=""):
 def render_session_md(info, messages, md_max):
     model = info.get("model") or {}
     tokens = info.get("tokens") or {}
-    cache = tokens.get("cache") or {}
     lines = [
         f"# {info.get('title') or 'Untitled session'}",
         "",
@@ -348,21 +423,31 @@ def render_session_md(info, messages, md_max):
         f" · last activity: {iso((info.get('time') or {}).get('updated'))}",
         f"- model: `{model.get('providerID', '?')}/{model.get('id', '?')}`"
         f" · agent: `{info.get('agent', '?')}`",
-        "- tokens: "
-        f"in={tokens.get('input', 0)} out={tokens.get('output', 0)} "
-        f"reasoning={tokens.get('reasoning', 0)} "
-        f"cache r={cache.get('read', 0)}/w={cache.get('write', 0)}"
-        f" · cost: ${info.get('cost', 0):.4f}"
-        f" · outcome: `{info.get('outcome', '?')}`",
-        "- messages: " + str(len(messages)),
-        "",
-        "Rendered by `scripts/export-agent-log` from `opencode session export`."
-        " Tool outputs are capped for readability; the full fidelity data"
-        " (every input and byte of output) is in the paired `.jsonl` file.",
-        "",
-        "---",
-        "",
     ]
+    if tokens:
+        cache = tokens.get("cache") or {}
+        usage = (
+            "- tokens: "
+            f"in={tokens.get('input', 0)} out={tokens.get('output', 0)} "
+            f"reasoning={tokens.get('reasoning', 0)} "
+            f"cache r={cache.get('read', 0)}/w={cache.get('write', 0)}"
+        )
+        if info.get("cost") is not None:
+            usage += f" · cost: ${info.get('cost'):.4f}"
+        lines.append(usage)
+    lines.append(f"- outcome: `{info.get('outcome', '?')}`")
+    lines.append("- messages: " + str(len(messages)))
+    lines.extend(
+        [
+            "",
+            "Rendered by `scripts/export-agent-log` from `opencode session export`."
+            " Tool outputs are capped for readability; the full fidelity data"
+            " (every input and byte of output) is in the paired `.jsonl` file.",
+            "",
+            "---",
+            "",
+        ]
+    )
     n_user = sum(1 for m in messages if m.get("type") == "user")
     n_assistant = sum(1 for m in messages if m.get("type") == "assistant")
     lines.append(
@@ -377,7 +462,8 @@ def render_session_md(info, messages, md_max):
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_jsonl(info, messages, session_id, project_dir, jsonl_max):
+def render_jsonl(info, messages, session_id, project_dir, jsonl_max,
+                 usage_hidden=False, redacted=False):
     meta = {
         "_type": "session-log-meta",
         "format": SCHEMA,
@@ -386,6 +472,8 @@ def render_jsonl(info, messages, session_id, project_dir, jsonl_max):
         "session_id": session_id,
         "project_dir": project_dir,
         "messages": len(messages),
+        "usage_hidden": bool(usage_hidden),
+        "redacted": bool(redacted),
         "session_info": info,
     }
     lines = [json.dumps(meta, ensure_ascii=False)]
@@ -441,6 +529,12 @@ def render_index(entries):
             " line with live session totals, the last assistant message of"
             " an in-progress turn, and this index's stats).",
             "",
+            "Personal/system strings are scrubbed at write time through the"
+            " LOCAL redaction map (`.agentlog-redactions`, gitignored -- see"
+            " `.agentlog-redactions.example` for the format), and usage"
+            " stats (tokens/cost) default to being hidden"
+            " (`AGENTLOG_HIDE_USAGE=1`).",
+            "",
             "The log is verbatim -- never paste secrets in a session that"
             " this tool will commit.",
             "",
@@ -457,6 +551,27 @@ def render_index(entries):
 # ----------------------------------------------------------------------------
 
 def main(argv):
+    # --apply-redactions MAP FILE... : scrub files in place (used by the
+    # pre-commit hook's history maintenance and by manual re-scrubbing).
+    if "--apply-redactions" in argv:
+        i = argv.index("--apply-redactions")
+        map_path = argv[i + 1]
+        targets = argv[i + 2:]
+        if not targets:
+            die("--apply-redactions needs at least one FILE")
+        s = scrubber(load_redactions(map_path))
+        changed = 0
+        for f in targets:
+            with open(f, encoding="utf-8") as fh:
+                text = fh.read()
+            new = s(text)
+            if new != text:
+                with open(f, "w", encoding="utf-8") as fh:
+                    fh.write(new)
+                changed += 1
+        log(f"scrubbed {changed}/{len(targets)} file(s)")
+        return EXIT_OK
+
     quiet = "--quiet" in argv
     project_dir = os.path.abspath(os.getcwd())
     out_dir = os.path.join(project_dir, DEFAULT_OUT)
@@ -470,6 +585,11 @@ def main(argv):
 
     md_max = int(os.environ.get("AGENTLOG_MD_MAX", DEFAULT_MD_MAX))
     jsonl_max = int(os.environ.get("AGENTLOG_JSONL_MAX", DEFAULT_JSONL_MAX))
+    hide_usage = os.environ.get("AGENTLOG_HIDE_USAGE", "1") not in (
+        "0", "false", "no")
+    redactions_file = find_redactions(project_dir)
+    rules = load_redactions(redactions_file)
+    scrub = scrubber(rules)
 
     opencode_bin = find_opencode()
     if not opencode_bin:
@@ -501,11 +621,16 @@ def main(argv):
     for s in sessions:
         sid = s["id"]
         payload = export_session(opencode_bin, sid)
+        if hide_usage:
+            payload = scrub_usage(payload)
         info = payload.get("info") or {}
         messages = payload.get("messages") or []
 
-        md = render_session_md(info, messages, md_max)
-        jsonl = render_jsonl(info, messages, sid, project_dir, jsonl_max)
+        md = scrub(render_session_md(info, messages, md_max))
+        jsonl = scrub(render_jsonl(
+            info, messages, sid, project_dir, jsonl_max,
+            usage_hidden=hide_usage, redacted=bool(rules),
+        ))
 
         with open(os.path.join(sessions_dir, f"{sid}.md"), "w") as fh:
             fh.write(md)
@@ -529,9 +654,6 @@ def main(argv):
             quiet,
         )
 
-    with open(os.path.join(out_dir, "README.md"), "w") as fh:
-        fh.write(render_index(index_entries))
-
     # remove artifacts for sessions that no longer exist server-side
     valid_files = {
         f"{e['id']}.md" for e in index_entries
@@ -543,6 +665,10 @@ def main(argv):
     for f in stale:
         os.remove(os.path.join(sessions_dir, f))
         log(f"removed stale artifact {f}", quiet)
+
+    # index is regenerated through the same scrubber
+    with open(os.path.join(out_dir, "README.md"), "w") as fh:
+        fh.write(scrub(render_index(index_entries)))
 
     if not quiet:
         total = sum(

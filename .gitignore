@@ -10,3 +10,6 @@ scratch/
 
 # Downloaded by setup.sh in dev/link installs (vendored plug.vim)
 autoload/plug.vim
+
+# Local redaction map for the agent log (PERSONAL -- never commit)
+.agentlog-redactions

@@ -1,0 +1,24 @@
+# Local redactions for the agent session log -- TEMPLATE, copy to
+# `.agentlog-redactions` and fill in with YOUR values.
+#
+# This file (`.agentlog-redactions`) is intentionally gitignored: the repo
+# ships the redaction mechanism and this example, never a personal map.
+#
+# Format: one rule per line,  REGEX :: REPLACEMENT
+#   * rules apply in order, to every rendered artifact (.md, .jsonl, index)
+#   * '#' lines are comments; blank lines are ignored
+#   * rules are idempotent, so re-running is always safe
+#
+# Typical personal values worth mapping away before a public repo:
+#
+# /home/<yourname> :: ~
+# <Your Name> :: <author>
+# <you>@<your.domain> :: <email>
+# <hostname> :: <host>
+# <other-private-project-words> :: <private-project>
+#
+# Related knobs (environment, handled by the exporter):
+#   AGENTLOG_HIDE_USAGE=1   default: token/cost stats hidden from the log
+#   AGENTLOG_MD_MAX=3000    cap per fenced block in the .md rendition
+#
+# After changing the map:  scripts/export-agent-log
