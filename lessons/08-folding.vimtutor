@@ -1,0 +1,78 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 8: Folds                                     =
+================================================================================
+
+  Folds hide text you are not currently caring about: bodies of
+  functions you are not editing, blocks of config, long comments. The
+  text is never deleted -- a fold is pure VIEWPORT metadata, exactly
+  like a window is.
+
+  1. Fold by indentation -- works here, works in any indented code:
+     ~
+     ~   :set foldmethod=indent<Enter>
+     ~   z M                  close everything (Mnemonic: More folds)
+     ~   Stand inside the block below and:
+     ~     z o                open ONE level
+     ~     z c                close again
+     ~     z a                toggle the fold you are in
+     ~   z R                  Reduce the folds: open everything
+     ~
+     ~      ~ level one
+     ~      ~   level two
+     ~      ~     level three
+     ~      ~   level two
+     ~      ~ level one
+
+  2. Manual folds -- draw your own:
+     ~
+     ~   :set foldmethod=manual<Enter>
+     ~   z f motion           create a fold (zfap = fold this paragraph)
+     ~   Select 3 lines with V, then zf -- a fold from your selection
+     ~   z F                  fold a fixed number of lines from here
+     ~   :1,4fold             any Ex range folds too
+     ~   z d                  delete THIS fold definition
+     ~   z E                  delete ALL folds in the buffer
+     ~
+     ~ zf, zF, zd, zE shape the fold STRUCTURE. The text is untouched.
+
+  3. Folding by syntax or expression:
+     ~
+     ~   :set foldmethod=syntax    when a syntax file provides fold
+     ~                             regions (many language plugins do)
+     ~   :set foldmethod=expr      follow any expression -- this is how
+     ~                             Neovim + treesitter folds are wired in
+     ~                             modern configs
+     ~
+     ~ Your config leaves folding OFF by default (foldmethod=manual, no
+     ~ folds open). Turn indent-folding on for good by adding
+     ~ set foldmethod=indent to your vimrc -- see Lesson 9.
+
+  4. The command set at a glance:
+     ~
+     ~   z o z c z a          open / close / toggle, the fold at cursor
+     ~   z O z C z A          the same, recursively (whole nest)
+     ~   z R z M              open all / close all
+     ~   z v                  open just enough to show the cursor
+     ~   [z  ]z               top / bottom of the current open fold
+     ~   z j z k              down / up to the next fold's start
+     ~
+     ~ Counts compose: 3zo opens three levels deep at once.
+
+  5. Options that make folds pleasant:
+     ~
+     ~   :set foldlevel=99    start with everything open, close by hand
+     ~   :set foldnestmax=3   no folds nested deeper than 3
+     ~   :set foldminlines=1  refuse to fold single lines
+     ~   :set foldcolumn=3    a gutter strip showing fold state, per line
+     ~   :h fold-commands     the full reference
+
+  SUMMARY -- Lesson 8
+
+  ~ :set foldmethod=...   indent, manual, syntax, expr (per-plugin)
+  ~ zf zF zd zE           define folds from selections, ranges, motion
+  ~ zo zc za  zO zC zA    open / close / toggle, plain and recursive
+  ~ zR zM                 open or close the world
+  ~ [z ]z zj zk           navigate fold structure
+  ~ foldlevel foldcolumn  make folds visible and predictable
+
+================================================================================

@@ -1,0 +1,82 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 7: Marks and Jumps                           =
+================================================================================
+
+  Real navigation is not cursor-walking -- it is remembering places and
+  moving in big, meaningful steps. Two systems do this: marks (you set
+  them) and the jumplist (Vim tracks it for you). Between classes at
+  school and jumplist ping-pong, you will rarely page through a file
+  line-by-line again.
+
+  1. Marks -- names for places:
+     ~
+     ~   m a--z              set a mark in THIS buffer (ma, mm, ...)
+     ~   m A--Z              a GLOBAL mark: survives switching files!
+     ~   ' a                 jump to mark a, start of line
+     ~   ` a                 jump to mark a, EXACT row and column
+     ~   :marks              list all marks in this session
+     ~   :delm a b c         delete specific marks (:delm! = a-z)
+     ~
+     ~ Set a mark m with mm here, wander down, return with 'm.
+     ~ Marks Vim sets by itself:
+     ~
+     ~   ''                  where you were before the last jump
+     ~   ``                  ...exact position (the pair you'll type most)
+     ~   `.                  position of the last change
+     ~   `^                  where insert mode was left
+
+  2. The jumplist -- Ctrl-O and Ctrl-I:
+     ~
+     ~   Ctrl-O              BACK through every jump you made
+     ~   Ctrl-I              FORWARD again (Tab too, unless remapped)
+     ~   3 Ctrl-O            three jumps back, one press
+     ~   :jumps              the whole trail with positions
+     ~
+     ~ What counts as a jump: gg, G, /, ?, n, N, {, }, (, ), %, and
+     ~ mark jumps. Plain h j k l and w e b do NOT -- the trail stays
+     ~ meaningful instead of recording every step.
+
+  3. A two-buffer ping-pong with global marks:
+     ~
+     ~   mA                  drop GLOBAL mark A on this lesson
+     ~   :e 08-<Tab>         open lesson 8 in this window
+     ~   mB                  drop global mark B there
+     ~   `A `B `A `B         bounce between two files at exact spots
+     ~   Ctrl-O              notice: the jumplist tracked the file hops
+     ~
+     ~ Global marks persist across sessions too (via viminfo/shada) --
+     ~ keep a few reserved: A project todo, B the test file, and so on.
+
+  4. The command window -- history as an editable buffer:
+     ~
+     ~   q:                  your COMMAND history in a split window
+     ~   q/                  your SEARCH history likewise
+     ~   Edit any line (regexes included!), press <Enter> to run it
+     ~   :q                  close the window without running anything
+     ~
+     ~ The unsung hero for long :s commands: open q:, fish out the last
+     ~ big substitute, edit just the pattern, Enter.
+
+  5. Structural motions -- move by shape, not by scroll:
+     ~
+     ~   %                   jump to the matching ( [ { under the cursor
+     ~   ]m ]M               next / previous start-of-method
+     ~   [m [M               same, backwards
+     ~   [[ ]]               previous / next section (C-like code)
+     ~   ]#  [#              next / previous C preprocessor #if-#endif
+     ~   gd gD               local / global declaration of word under cursor
+     ~
+     ~ With a language server (Lesson 12, coc.nvim) gd becomes semantic:
+     ~ a true definition jump across files, recorded in the same
+     ~ jumplist, Ctrl-O brings you home.
+
+  SUMMARY -- Lesson 7
+
+  ~ m a  m A  ' a  ` a    marks: local, global, linewise, exact
+  ~ ''  ``  `.  `^        the free ones: back, back-exact, change, insert
+  ~ :marks :delm          list and delete marks
+  ~ Ctrl-O Ctrl-I :jumps  the jumplist: big-step history
+  ~ q: q/ :q              command window -- history you can edit
+  ~ % ]m [[ gd gD         structural motions (LSP upgrades gd)
+
+================================================================================

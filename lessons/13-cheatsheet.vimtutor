@@ -1,0 +1,68 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 13: Cheat Sheet (one page)                   =
+================================================================================
+
+  WINDOWS AND SPLITS                                     (Lesson 1)
+  ~ :split :vsplit :new :vnew     Ctrl-W h j k l w p H J K L r x T
+  ~ Ctrl-W c q o + - = _ | < >    :resize N :vertical resize N
+
+  BUFFERS AND TABS                                       (Lesson 2)
+  ~ :ls :b name<C-t> :bn :bp :b#  Ctrl-6 :bd [!] :ball :vertical ball
+  ~ :bufdo :windo :tabnew gt gT Ngt :tabs :tabclose :tabonly :tabmove
+
+  REGISTERS                                              (Lesson 3)
+  ~ "ayyw "Aappend "_blackhole "+clipboard "0p (last yank) :reg :put a
+
+  MACROS                                                 (Lesson 4)
+  ~ q{reg} ... q    @a  @@  5@a    :'<,'>normal @a    :put a :let @a=".."
+
+  VISUAL AND TEXT OBJECTS                                (Lesson 5)
+  ~ v V Ctrl-V gv o O I A c ~     iw aw i( i{ i" ip it  2i)
+  ~ :sort :'<,'>s/old/new/g       surround: cs ds ysiw S"
+
+  SEARCH, REPLACE, QUICKFIX                              (Lesson 6)
+  ~ * # n N :noh                  :%s/old/new/g  gi gc  :&&
+  ~ \v (very magic)  \zs \ze      :g/pat/cmd  :v/inv-pat/d
+  ~ :vimgrep /pat/j **/* :copen   :cn :cp :cc N  :cfdo %s/././g | update
+  ~ q: q/  Ctrl-R Ctrl-W  Ctrl-R / :%s/pat//gn (count only)
+
+  MARKS AND JUMPS                                        (Lesson 7)
+  ~ ma mA 'a `a :marks :delm      Ctrl-O Ctrl-I :jumps
+  ~ '' `` `. `^                   % ]m [m [[ ]] ]# gd gD   q: q/
+
+  FOLDS                                                  (Lesson 8)
+  ~ :set foldmethod=indent        zf zfap zF zd zE (manual)
+  ~ zo zc za zO zC zA             zR zM zj zk [z ]z foldcolumn
+
+  CONFIG, PLUGINS, THEMES                                (Lesson 9)
+  ~ :e $MYVIMRC :source $MYVIMRC  :options :echo stdpath('data')
+  ~ nnoremap <leader>x ...        let mapleader = " "
+  ~ :PlugStatus :PlugInstall :PlugUpdate :PlugClean
+  ~ :CocInstall coc-tsserver      :Theme gruvbox  :colorscheme <Tab>
+
+  FILES, :args, SESSIONS, netrw                          (Lesson 10)
+  ~ :Ex :Sexplore :Vexplore :Texplore   v o t i - D R (in netrw)
+  ~ :set path+=** :find gf Ctrl-W gF    :args :argdo ... | update
+  ~ :mksession ~/s.vim  vim -S ~/s.vim  :mkview :loadview :lcd :e!
+
+  TERMINAL AND GIT                                       (Lesson 11)
+  ~ :!cmd :r !cmd :%!cmd :sh Ctrl-Z fg
+  ~ :term i Ctrl-\ Ctrl-N :bd     :G (- s cc <Enter> D)  :Git blame
+  ~ :Gvdiffsplit ]c [c dp do      :vertical diffsplit file
+
+  COMPLETION AND LSP (coc.nvim)                          (Lesson 12)
+  ~ Ctrl-Space Ctrl-N Ctrl-P Tab Ctrl-y Ctrl-e
+  ~ K  gd  gr  gy  gi  Ctrl-O     ]d [d :CocList diagnostics
+  ~ <Leader>rn <Leader>ac <Leader>qf    :CocList outline :CocCommand
+  ~ :CocConfig :CocInfo :CocRestart :CocInstall :CocList extensions
+
+  WHERE THINGS LIVE
+  ~ ~/.vimrc / ~/.config/nvim/init.vim    your init file (one source line)
+  ~ ~/.local/share/vimtutor/              this tutor: lessons + shared config
+  ~ config/vimrc.common                   the actual shared configuration
+  ~ plugged/                              vim-plug clones
+  ~ stdpath('data')/coc/extensions        coc extensions
+
+  Back to the TOC:  :Tutor      Next lesson:  :Tutor 0  for the index.
+
+================================================================================

@@ -1,0 +1,107 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 9: Config, Mappings, Plugins, Colorschemes   =
+================================================================================
+
+  Where YOUR configuration lives:
+
+  ~  Vim:       ~/.vimrc      Neovim: ~/.config/nvim/init.vim
+  ~
+  ~ setup.sh created both with a two-line job: source one shared file
+  ~ so a single configuration serves both editors:
+  ~
+  ~     ~/.local/share/vimtutor/config/vimrc.common
+  ~
+  ~ Change options in the shared file, or add your own below it -- your
+  ~ editor's own init file is the right place for personal overrides,
+  ~ because setup.sh must never have to rewrite it.
+
+  1. Find it every time, free of charge:
+     ~
+     ~   :e $MYVIMRC            open YOUR active init file
+     ~   :echo $MYVIMRC         or just see its path
+     ~   Follow the source line to the shared config, then:
+     ~   :source $MYVIMRC       reload after editing (alias :so %)
+
+  2. Options worth knowing cold:
+     ~
+     ~   :options<Enter>     the built-in browse-every-option page
+     ~   :set nu? rnu?       number + relativenumber: relative digits are
+     ~                       what makes  d3j  countable at a glance
+     ~   :set hidden?        switch buffers without saving first
+     ~   :set undodir?       plus 'undofile' -- history survives restarts
+     ~   :set path?          what :find searches (Lesson 10 extends it)
+     ~   :set so?            scrolloff: 8 lines of context at the edge
+     ~   :set wildmenu?      the cmdline completion menu below :e <Tab>
+
+  3. Mappings -- and the nnoremap rule:
+     ~
+     ~   :nnoremap <leader>t :tabnew<Enter>          define one, live!
+     ~   Press <Space>t right now -- a new tab opens.
+     ~   :nmap <leader>t      ...and :nmap shows what it points at
+     ~
+     ~   The rule: map RECURSIVE variants (map, nmap) can trigger other
+     ~   mappings -- an accident-prone chain. Always define with the
+     ~   non-recursive set:  nnoremap inoremap vnoremap xnoremap.
+     ~
+     ~   <leader> is your personal prefix. The shared config sets
+     ~   let mapleader = " "  (the space bar). :echo mapleader to check.
+     ~   Vim waits a moment for the next key: :set timeoutlen?
+
+  4. Plugins managed IN the editor -- vim-plug:
+     ~
+     ~   :PlugStatus            what is installed, what is missing
+     ~   :PlugInstall           fetch everything missing (first run!)
+     ~   :PlugUpdate            update the installed ones
+     ~   :PlugClean             remove plugins no longer in the config
+     ~
+     ~   The :Plug lines live in the shared config under the comment
+     ~   "Plugins via vim-plug"; clones land in plugged/ beside it.
+     ~   What the reasonable defaults give you:
+     ~
+     ~  ~ coc.nvim                    completion + LSP client (Lesson 12).
+     ~  ~                             Needs Node.js 18+. Vim AND Neovim.
+     ~  ~ vim-polyglot (Vim) /        rich, fast syntax highlighting for
+     ~  ~ nvim-treesitter (Neovim)    200+ filetypes
+     ~  ~ vim-airline (Vim) /         the status line you see above/below
+     ~  ~ lualine (Neovim)
+     ~  ~ gruvbox + tokyonight        colorschemes
+     ~  ~ fugitive                    git inside vim (Lesson 11)
+     ~  ~ surround, commentary, sleuth  tiny, daily quality-of-life
+     ~  ~ fzf.vim                     fuzzy finder -- only installed when
+     ~  ~                             the fzf + ripgrep binaries exist
+     ~
+     ~   coc EXTENSIONS are a second, coc-managed family, also installed
+     ~   from inside the editor:   :CocInstall coc-json coc-tsserver
+
+  5. Colorschemes:
+     ~
+     ~   :colorscheme<Space><Tab>     cycle through what is available
+     ~   :colorscheme gruvbox         the classic
+     ~   :colorscheme tokyonight      (Neovim only -- it is a Lua theme)
+     ~   :set background?             dark/light; good schemes respect it
+     ~
+     ~   The shared config defines a helper that switches AND remembers:
+     ~
+     ~     :Theme tokyonight          applies immediately; to make it
+     ~                                permanent set g:vimtutor_theme
+     ~                                in the shared config file.
+
+  6. Where everything actually lives, on disk:
+     ~
+     ~   :echo stdpath('config')     Neovim init dir -- Vim: ~/.vim
+     ~   :echo stdpath('data')       plugins, undodir, coc extensions
+     ~   :echo g:vimtutor_plugdir    where vim-plug clones things
+     ~   :checkhealth                Neovim's built-in self-diagnosis
+     ~   :CocInfo                    coc's version + info, same spirit
+
+  SUMMARY -- Lesson 9
+
+  ~ :e $MYVIMRC :so %         open and reload your config safely
+  ~ :options                  browse every option with explanations
+  ~ nnoremap (never nmap)     define mappings non-recursively
+  ~ let mapleader = " "       a personal prefix for your keys
+  ~ :PlugStatus :PlugInstall  vim-plug manages plugins in-editor
+  ~ :CocInstall coc-...       coc manages ITS extensions separately
+  ~ :Theme name               switch colorschemes (helper from config)
+
+================================================================================

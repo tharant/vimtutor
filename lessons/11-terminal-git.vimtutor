@@ -1,0 +1,80 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 11: Terminals and Git (fugitive)            =
+================================================================================
+
+  1. Shell work from inside the editor:
+     ~
+     ~   :!ls -la            run a shell command, peek at output, <Enter>
+     ~   :!python3 %         % expands to the current file's path
+     ~   :r !date            READ a command's output below the cursor
+     ~   :!sort %            send the file through a filter... then
+     ~   :%!sort             ...actually replace the buffer with it
+     ~   :sh                 a full interactive shell; return with exit
+     ~   Ctrl-Z / fg         suspend the editor, come back to it
+     ~
+     ~  :r !cmd and :%!cmd are the pair to memorize: insert below cursor
+     ~  versus transform the selection.
+
+  2. :term -- a real terminal in a split (Vim 9 and Neovim):
+     ~
+     ~   :term               terminal buffer below the current window
+     ~   :vertical term      side by side; :tab term its own tab
+     ~   i                   send keystrokes to the shell (insert mode)
+     ~   Ctrl-\ Ctrl-N       back to NORMAL mode over the terminal
+     ~   :bd                 close the terminal buffer when done
+     ~
+     ~ Run a build inside :term and scroll its errors with normal vim
+     ~ keys; jump to a file:line it prints with gf or <Enter>-style
+     ~ quickfix tooling from Lesson 6.
+
+  3. fugitive -- git where it belongs (plugin from your config):
+     ~
+     ~   :G                  git status as a BUFFER -- the daily hub
+     ~     Inside the status window:
+     ~       -               stage / unstage the file under cursor
+     ~       s  /  u         stage / unstage explicitly
+     ~       cc              commit: a commit buffer opens; write the
+     ~                       message and :wq to actually commit
+     ~       <Enter>         open the file under cursor
+     ~       D               discard local changes (destructive -- it asks)
+     ~   :Git blame          the blame view: press A C D O to toggle the
+     ~                       author/commit/date columns, o for a split
+     ~   :Gvdiffsplit        compare this buffer with its HEAD version
+     ~   :Gvdiffsplit HEAD~1 ...or with the version before that
+     ~   :Git push           plain git, real output, async (vim: waits)
+     ~   :Git log --oneline  pager-less history; :q closes it
+     ~
+     ~ NOTE on spellings: :G and :Git are the same in fugitive 4.x; older
+     ~ versions spelled these :Gstatus :Gblame :Gvdiffsplit. Either way,
+     ~ :G with no argument opens the status hub.
+
+  4. Diffs -- not only git's:
+     ~
+     ~   :vertical diffsplit other-file    two files, differences marked
+     ~   Inside a diff window pair:
+     ~     ]c  [c            next / previous difference
+     ~     dp                diff-put: push THIS pane's hunk to the other
+     ~     do                diff-obtain: pull the other pane's hunk here
+     ~     :diffupdate       re-synchronize after lots of edits
+     ~
+     ~ The same machinery powers :Gvdiffsplit -- learn it once, use it
+     ~ for merge conflicts too.
+
+  5. A real terminal-git round trip:
+     ~
+     ~   :G                  status hub; stage this lesson with -
+     ~   cc                  commit buffer: type a message, :wq to commit
+     ~   :Git push           (in a scratch copy nothing really leaves --
+     ~                       but the flow is exactly what you'll type
+     ~                       in a real repository)
+
+  SUMMARY -- Lesson 11
+
+  ~ :!cmd :r !cmd :%!cmd     run, insert below, transform selection
+  ~ :term i Ctrl-\ Ctrl-N    terminal splits, and the one chord to know
+  ~ :G  -  s  cc  <Enter>    the status hub as your daily git UI
+  ~ :Git blame :Gvdiffsplit  archaeology and comparisons
+  ~ ]c [c dp do              diff navigation and hunk transfer
+  ~ :sh Ctrl-Z fg            stepping out without losing your place
+
+================================================================================

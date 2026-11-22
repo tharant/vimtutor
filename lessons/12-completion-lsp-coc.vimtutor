@@ -1,0 +1,101 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 12: Completion and LSP with coc.nvim         =
+================================================================================
+
+  coc.nvim is the bridge between your editor and language servers
+  (LSP). One Node.js-based setup serves BOTH Vim and Neovim with the
+  same keys: popup completion, live diagnostics, hover docs, rename,
+  code actions. setup.sh installed Node for you; plugins install via
+  :CocInstall (Lesson 9).
+
+  1. Completion in practice:
+     ~
+     ~   :e demo/lang-demo.js<Enter>     the scratch copy of the demo
+     ~   :cd %:p:h                       make the demo dir the workspace
+     ~                                   root (coc infers it from cwd)
+     ~
+     ~  Inside the demo file, after "console." -- just start typing:
+     ~
+     ~   console.l       the menu pops by itself (it is tsserver talking)
+     ~   If nothing pops:  Ctrl-Space forces the trigger
+     ~
+     ~   Inside the popup menu:
+     ~     Ctrl-N Ctrl-P    next / previous item (works in any popup)
+     ~     Tab              accept (and expand snippets, if any)
+     ~     Ctrl-y  /  Ctrl-e   accept / reject with a single key
+     ~
+     ~  Complete .log( then watch the floating signature docs. Insert
+     ~  mode navigation: the menu is a normal part of editing -- no
+     ~  mode change to reach it.
+
+  2. Diagnostics -- errors as you type:
+     ~
+     ~   :CocList diagnostics<Enter>     every problem, searchable list
+     ~     j k to move, <Enter> to jump, q to close the list
+     ~   ]d  /  [d                        next / previous diagnostic
+     ~
+     ~  The signs in the sign column next to line numbers are coc's
+     ~  live diagnostics (E/W/I). They turn on with the plugin -- no
+     ~  extra config. :CocList diagnostics is the searchable window
+     ~  over that same data.
+     ~
+     ~  (In the demo, line-length or unused-variable warnings only
+     ~  appear once the tsserver extension is around: :CocInstall
+     ~  coc-tsserver -- Lesson 9 step 4.)
+
+  3. Hover, definition, references -- the navigation core:
+     ~
+     ~   K               hover documentation for the symbol at cursor
+     ~   gd              go to DEFINITION (and the jumplist knows!)
+     ~   Ctrl-O          ...come back home through the same trail
+     ~   gr              list all REFERENCES (a location list opens)
+     ~   gy / gi         type definition / implementation
+     ~
+     ~  Try in the demo: K on console.log, gd into its declaration,
+     ~  Ctrl-O back, gr on announce to see both call sites.
+
+  4. Rename and code actions -- safe refactoring:
+     ~
+     ~   <leader>rn      RENAME across the workspace (your config maps it)
+     ~   <leader>ac      CODE ACTION at cursor: fixes, refactors
+     ~   <leader>qf      the QUICKFIX action when a diagnostic offers one
+     ~   (your shared config defines these; :nmap <leader>rn to verify)
+     ~
+     ~  In the demo: rename announce with <leader>rn, type a new name,
+     ~  Enter -- both files' references follow, because it is the
+     ~  language server doing it, not a regex.
+
+  5. The lists and commands surface:
+     ~
+     ~   :CocList                open the list picker (outline, symbols...)
+     ~   :CocList outline        the file's structure as a tree
+     ~   :CocCommand             everything searchable: try
+     ~                           :CocCommand editor.action.formatDocument
+     ~   :CocConfig              opens coc-settings.json -- JSON, not vimrc
+     ~   :CocRestart             when a server sulks
+     ~   :CocInfo                version + diagnostics for bug reports
+
+  6. Language servers per language (the usual suspects):
+     ~
+     ~   :CocInstall coc-tsserver        javascript / typescript
+     ~   :CocInstall coc-json            json (used for :CocConfig itself)
+     ~   :CocInstall coc-pyright         python
+     ~   :CocInstall coc-clangd          C/C++ (auto-installs clangd)
+     ~   :CocList extensions             what is installed right now
+     ~
+     ~ NOTE: differences worth knowing. In Neovim you may meet configs
+     ~ based on nvim built-in LSP + nvim-cmp instead of coc; the DATA is
+     ~ the same, only keys/config differ. This tutor standardizes on coc
+     ~ so keys match across both editors. Also: coc needs a modern Node
+     ~ (18+). If popups never appear, :CocInfo and :checkhealth will say.
+
+  SUMMARY -- Lesson 12
+
+  ~ Ctrl-Space Ctrl-N Ctrl-P Tab     trigger, choose, accept
+  ~ K gd gr gy gi Ctrl-O             hover / definition / references / back
+  ~ :CocList diagnostics ]d [d       see and traverse every problem
+  ~ <Leader>rn <Leader>ac <Leader>qf  rename, act, quickfix
+  ~ :CocList outline :CocCommand     structure and the command palette
+  ~ :CocInstall :CocConfig :CocInfo  extend, configure, troubleshoot
+
+================================================================================

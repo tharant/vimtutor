@@ -1,0 +1,83 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 10: Files, :args, Sessions, netrw            =
+================================================================================
+
+  1. netrw -- the file browser built into both editors:
+     ~
+     ~   :Ex            explore the current file's folder in the current
+     ~                  window (alias :Explore)
+     ~   :Sexplore      same, horizontal split    :Vexplore vertical
+     ~   :Texplore      same, in a NEW TAB (great with Lesson 2's model)
+     ~   :e .           explore the working directory
+     ~
+     ~ Keys inside a netrw listing:
+     ~   <Enter>        open the file under cursor
+     ~   v / o          open in a vertical / horizontal split
+     ~   t              open in a new tab
+     ~   i              cycle the view: (thin) long / wide / tree
+     ~   -  u           go to the parent directory / jump back
+     ~   D R            delete (asks first) / rename a file
+     ~
+     ~ netrw buffers are normal buffers named like folders -- :bd them.
+
+  2. :find -- open by fragment, from anywhere below the cwd:
+     ~
+     ~   :set path+=**        (your shared config does this already)
+     ~   :find 03-<Tab>       fuzzy-ish: searches the whole tree
+     ~   gf                   open the file path under the cursor
+     ~   Ctrl-W f             ...in a split, Ctrl-W gF in a new tab
+     ~   Ctrl-W gF            jumps to the file:line after a path:33 too
+     ~
+     ~  With path+=** you rarely walk to a file again: type a fragment,
+     ~  Tab, Enter.
+
+  3. The argument list -- edit a SET of files as one unit:
+     ~
+     ~   :args                   what file set am I working on right now?
+     ~   :args **/*.vimtutor     the scratch lessons become the file set
+     ~   :argdo set nu?          run a command on EVERY file of the set
+     ~   :first :next :previous  walk the set (aliases :n :N :prev)
+     ~
+     ~   The edit-all-files pairing used in real life:
+     ~     :argdo %s/old_name/new_name/gc | update
+     ~   (:update saves only files that actually changed.) Lesson 6's
+     ~   :cfdo and this :argdo are siblings: hits vs declared file set.
+
+  4. Sessions -- checkpoint your whole layout:
+     ~
+     ~   :mksession ~/tutor-session.vim     windows, tabs, sizes, cwd,
+     ~                                      buffer list -- the works
+     ~   :mks!                              overwrite/update it in place
+     ~   :qall!                             end the session...
+     ~   (restart)  vim -S ~/tutor-session.vim      and it is all back
+     ~   (or inside) :source ~/tutor-session.vim
+     ~
+     ~   :set sessionoptions?               what gets captured -- trim it
+     ~   :mkview  :loadview                 per-file mini-sessions instead
+     ~
+     ~ In Neovim the same recipe works:  nvim -S ~/tutor-session.vim
+
+  5. File commands worth having in your fingers:
+     ~
+     ~   :pwd                    print cwd;  :cd changes it;  :lcd per-window
+     ~   :e!                     reload the file, DISCARDING local edits
+     ~   :e #  (Ctrl-6)          back to the alternate buffer
+     ~   :enew                   a fresh, unsaved scratch buffer
+     ~   :saveas newname         re-route all future writes elsewhere
+     ~   :file newname           rename the buffer only
+     ~   2 Ctrl-G                verbose position: line, column, byte...
+     ~
+     ~ And the safety net for permissions mistakes (:w on a read-only
+     ~ file):  :w !sudo tee % >/dev/null   write it with sudo. Try it
+     ~ only when a file of YOURS is genuinely read-only.
+
+  SUMMARY -- Lesson 10
+
+  ~ :Ex :Sexplore :Vexplore :Texplore  the built-in file browser
+  ~ :set path+=** :find gf             open by fragment, not by walking
+  ~ :args :argdo ... | update          batch-edit a declared file set
+  ~ :mksession ~/x.vim  vim -S x.vim   checkpoint and restore layouts
+  ~ :mkview :loadview                  per-file layout memory
+  ~ :lcd :e! :saveas :file             the practical file toolkit
+
+================================================================================
