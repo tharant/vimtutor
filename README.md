@@ -17,7 +17,7 @@ practice changes away by exiting with `:q!`.
 ## Quick start (`curl | sh`)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR-GITHUB-USERNAME/vimtutor/main/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tharant/vimtutor/main/setup.sh | sh
 ```
 
 Then in your editor:
@@ -27,8 +27,8 @@ Then in your editor:
 :Tutor           " start at the table of contents
 ```
 
-> The `YOUR-GITHUB-USERNAME` placeholder should be the repo's real location
-> (replace it after pushing this repository — see "For developers" below).
+> One-liners point at `tharant/vimtutor`; if you fork, adjust the two URLs
+> (the constant in `setup.sh` and the paths above) to your own slug.
 
 ## What `setup.sh` does (and deliberately does not do)
 
@@ -85,7 +85,7 @@ endif
 ## Manual install (no `curl | sh`)
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/vimtutor.git
+git clone https://github.com/tharant/vimtutor.git
 cd vimtutor
 sh setup.sh --repo "$(pwd)"          # everything, from the local checkout
 # or just print the plan first:
@@ -199,6 +199,13 @@ Neovim/after for Vim — your file always wins):
 - Before publishing, replace `YOUR-GITHUB-USERNAME` in `setup.sh` (one
   constant) and in the README, push, and the `curl -fsSL .../setup.sh | sh`
   one-liner above becomes live.
+- The committed agent log contains no personal data by construction: it is
+  scrubbed through the local, gitignored `.agentlog-redactions` map on
+  every export (see `AGENTS.md`). Keep your map out of the repo; if a
+  future output reveals a new pattern, extend the map and regenerate
+  (`scripts/export-agent-log`) before committing. For a fresh fork: copy
+  `.agentlog-redactions.example`, fill in your values, then run the
+  exporter once before the first public commit.
 
 ## Agent session log
 

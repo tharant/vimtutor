@@ -18,7 +18,7 @@
 #   --editor=both|vim|nvim   which editor to install/wire   (default: both)
 #   --repo=URL_or_PATH       git URL (or local dir) of the tutor repo
 #                            (default: $VIMTUTOR_REPO_URL, else the built-in
-#                            URL below -- replace after forking!)
+#                            URL below).
 #   --home=DIR               install root  (default: $VIMTUTOR_HOME, else
 #                            ~/.local/share/vimtutor)
 #   --refresh                re-copy an EXISTING local --repo install
@@ -35,7 +35,7 @@
 set -eu
 umask 022
 
-REPO_URL_DEFAULT='https://github.com/YOUR-GITHUB-USERNAME/vimtutor'
+REPO_URL_DEFAULT='https://github.com/tharant/vimtutor'
 REPO_URL="${VIMTUTOR_REPO_URL:-$REPO_URL_DEFAULT}"
 REPO_ARG=''
 HOME_DIR="${VIMTUTOR_HOME:-}"
