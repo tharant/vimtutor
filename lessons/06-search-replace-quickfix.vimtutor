@@ -1,0 +1,98 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 6: Search, :s, :global, Quickfix             =
+================================================================================
+
+  Searching and replacing is where Vim either feels clumsy or feels
+  like a superpower. The difference is knowing: flags on :s, very-magic
+  regexes, :global, and using the quickfix list to edit MANY files at
+  once. Your shared config already sets -- :set ignorecase smartcase?
+
+  1. The search loop:
+     ~
+     ~   /pattern<Enter>   search forward; ? backward; n N next/prev hit
+     ~   *                 search the word under the cursor (whole word)
+     ~   :noh              clear the highlighting until the next search
+     ~   :set hlsearch!    turn highlighting off for real
+     ~
+     ~ Search for alpha in this lesson, hop around with n, N, come back
+     ~ with Ctrl-O. That jumplist integration is part of the point.
+
+  2. :s -- the flags you will actually use:
+     ~
+     ~   :%s/alpha/BETA/g       whole file, every hit per line
+     ~   :%s/alpha/BETA/gi      ...case-insensitive (I: force sensitive)
+     ~   :%s/alpha/BETA/gc      CONFIRM each hit: y n a q l keys below
+     ~   :'<,'>s/alpha/BETA/g   only the visually selected lines
+     ~   :&&                    repeat the last :s exactly (keeps flags)
+     ~   :%s//BETA/g            SEARCH half empty = reuse your last /search
+     ~   :%s/alpha//gn          the n flag: just COUNT -- nothing changes
+     ~
+     ~ At the c-confirm prompt: y = yes, n = no, a = yes-to-all-here,
+     ~ l = last one then stop, q = quit. Ctrl-E / Ctrl-Y scroll around
+     ~ while deciding.
+
+  3. Very magic -- regexes that read like other tools:
+     ~
+     ~   In Vim's default magic, ( ) | + ? must be BACKSLASHED. Prefix
+     ~   \v ("very magic") and they are literal-meaning again:
+     ~
+     ~     :%s/\v(alpha_value|beta_value)/\1_v2/g     \1 \2 = capture groups
+     ~     :%s/\vdate=\zs\d\ze/2026/   \zs starts the match AFTER 'date=',
+     ~                                 \ze ends it -- replace only digits
+     ~
+     ~   Practice the \v form on this lesson's own text: count matches
+     ~   FIRST with the n flag:  :%s/\v(alpha)+//gn<Enter>  (no change!)
+
+  4. :global -- run an Ex command on every matching line:
+     ~
+     ~   :g/TODO/t$              copy every TODO line to the buffer end
+     ~   :g/^#/d                 delete every line starting with #
+     ~   :v/TODO/d               the INVERSE: delete lines WITHOUT it
+     ~   :g/;/normal A           run normal-mode keys per matching line
+     ~   :g//                    no pattern = reuse the last search
+     ~
+     ~   :g is nearly a programming language (help :g). These four idioms
+     ~   cover 90% of daily use.
+
+  5. The quickfix list -- searching across MANY files:
+     ~
+     ~   :cd %:p:h               make the scratch folder the working dir
+     ~   :vimgrep /TODO/j **/*   collect matches from every file (j: don't
+     ~                           jump to the first hit yet)
+     ~   :copen                  the quickfix window -- every hit, file:line
+     ~   <Enter> in the list     jump to that hit
+     ~   :cn :cp :cc 3           next / previous / entry number 3
+     ~   :cclose                 close the window
+     ~
+     ~   Bulk-edit the HITS, not whole files:
+     ~
+     ~   :cfdo %s/TODO/NOTE~/gc  substitute in every file that had hits
+     ~   :cfdo update            save each file that changed
+     ~   :cdo %s/TODO/x/g        (per-ENTRY variant, both editors have it)
+     ~
+     ~ NOTE: **/* is the "all files, all subdirectories" glob. :vimgrep
+     ~ also accepts shell-style patterns for one directory.
+
+  6. Command-line helpers for heavy regex work:
+     ~
+     ~   q/                      your search HISTORY as an editable buffer
+     ~   q:                      ...same for commands (edit, Enter = run)
+     ~   Ctrl-R Ctrl-W           paste the word under cursor into cmdline
+     ~   Ctrl-R /                paste the last search pattern into cmdline
+     ~   :%s/TODO//gn            COUNT occurrences (n flag: report, no edit)
+     ~
+     ~  For gnarly patterns, build them inside q/ where editing is easy,
+     ~  then reuse from the cmdline with Ctrl-R /.
+
+  SUMMARY -- Lesson 6
+
+  ~ * # n N :noh hlsearch         basic search loop + highlighting
+  ~ :%s/old/new/g  gi gc  :&&     substitutes with the flags that matter
+  ~ :'<,'>s                       range from visual selection
+  ~ \v \zs \ze                    very magic + match-edge pinning
+  ~ :g/pat/cmd :v/pat/d           global: act per matching line
+  ~ :vimgrep :copen :cn :cc 3     quickfix across files
+  ~ :cfdo :cdo :cfdo update       edit every hit, save what changed
+  ~ q: q/ Ctrl-R Ctrl-W Ctrl-R /  cmdline as a first-class editor
+
+================================================================================

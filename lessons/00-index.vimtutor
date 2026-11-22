@@ -1,0 +1,61 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Table of Contents                                   =
+================================================================================
+
+  Welcome back! You know the basics already: h j k l to move, i a o to
+  insert, x dd u to delete and undo, /pattern to search, :w :q to save
+  and quit. This tutor picks up where that one left off -- windows,
+  buffers, registers, macros, quickfix, folding, mappings, and the
+  plugin features your setup installed: completion via coc.nvim, a
+  status line, colorschemes, git, and more.
+
+  HOW THIS TUTOR WORKS
+
+  ~ Just like the original tutor, every lesson opens as a SCRATCH COPY.
+  ~ Type freely -- your changes are thrown away when you quit with :q!
+  ~ (the plugin quietly edits a temporary copy so nothing can break).
+  ~ Every lesson ends with the :Tutor number of the next one. Come back
+  ~ to this index at any time with:
+
+        :Tutor
+
+  ~ From this index, put the cursor on a |01|-style entry and press
+  ~ <Enter> to open that lesson.
+
+  PRACTICE FILES
+
+  Every lesson is copied into a scratch folder together with all other
+  lessons and the demo files from lessons/demo/. The file and buffer
+  exercises therefore use REAL files you can hop between. Peek now:
+
+        :e 05-<Tab>     (type :e 05- then press Tab, then Enter)
+        :ls             (the buffer list -- you are in buffer 1)
+        :e 00-<Tab>     (back to this index)
+
+  VERSIONS
+
+  Tested with Vim 9.1+ and Neovim 0.10+. Where the two editors differ,
+  the lesson says so. Check which one you are in:
+
+        :echo has('nvim')        (prints 1 in Neovim, 0 in Vim)
+
+  TABLE OF CONTENTS
+
+  |01|  Windows and splits
+  |02|  Buffers and tabs -- the mental model
+  |03|  Registers beyond basics
+  |04|  Macros: recorded power
+  |05|  Visual modes and text objects
+  |06|  Search, :s, :global, and the quickfix list
+  |07|  Marks and jumps
+  |08|  Folds
+  |09|  Your config file: mappings, plugins, colorschemes
+  |10|  Files, :args, sessions, and netrw
+  |11|  Terminals and git (fugitive)
+  |12|  Completion and LSP with coc.nvim
+  |13|  Cheat sheet: the advanced keys on one page
+
+  Shortcuts:  :Tutor 13  for the cheat sheet at any time,  :Tutor 9  to
+  re-read how the plugins are configured.
+
+================================================================================

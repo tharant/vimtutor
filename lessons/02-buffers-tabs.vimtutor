@@ -1,0 +1,102 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 2: Buffers and Tabs, the Mental Model        =
+================================================================================
+
+  THE THREE-LEVEL MODEL -- picture this before every "where am I?" doubt
+
+  ~  buffer   one in-memory copy of a file's text. All 14 lessons plus
+  ~           the demo files are loaded right now -- see the list with
+  ~           :ls. Most of them appear NOWHERE: that is normal. Windows
+  ~           are views; buffers are the content.
+  ~  window   a viewport onto ONE buffer; splits show 2+ at a time
+  ~  tab      one complete LAYOUT of windows -- a spare workbench,
+  ~           not a stack of "pages" like in a GUI editor
+
+  ~      tab 1:                    +-----------+ +-------------+
+  ~      a layout of windows       | buffer 00 | | buffer 01   |
+  ~      showing two of the        | (index)   | | (splits)    |
+  ~      17 in-memory buffers      +-----------+ +-------------+
+
+  1. See what is loaded:
+     ~
+     ~  :ls<Enter>             list buffers: number, state, name
+     ~  :ls!<Enter>            also the unlisted/hidden ones
+     ~
+     ~ State letters you will meet: a = active (shown), h = hidden
+     ~ (loaded, not shown), % = this window's buffer, # = alternate -- 
+     ~ the one you came from.
+
+  2. Switching -- the daily bread:
+     ~
+     ~  :b 05-<Tab>            type a prefix, Tab completes, Enter jumps
+     ~  :bn  /  :bp            next / previous buffer in the list
+     ~  :b#                    jump to the alternate buffer
+     ~  Ctrl-6  (Ctrl-^)       same jump as :b#, without the command line
+     ~
+     ~ Toggle between this lesson and another with Ctrl-6 a few times.
+     ~ This is the single most-used buffer key in real work.
+
+  3. Open, close, and the "hidden" setting:
+     ~
+     ~  :e 03-<Tab>            load a buffer into the CURRENT window
+     ~  :vsplit 04-<Tab>       load one into a NEW window instead
+     ~  :bd                    delete this buffer from the list
+     ~  :bd!                   ...even if it has unsaved changes
+     ~
+     ~ NOTE: 'hidden' is ON in your shared config, so switching away
+     ~ from an edited buffer no longer demands a save first. :ls marks
+     ~ such buffers with + or a in the state column. :bd on an edited
+     ~ buffer still complains -- that complaint protects you; use :bd!
+     ~ only when you mean it.
+
+  4. One window per buffer:
+     ~
+     ~  :ball                  a window for every listed buffer
+     ~  :vertical ball         the same, side by side (wide screens!)
+     ~  Ctrl-W o               back to one window only
+     ~
+     ~ Try :vertical ball -- the famous "everything at once" view.
+     ~ Windows appear in buffer-number order, top-to-bottom on the
+     ~ left, continuing to the right.
+
+  5. Loop over all of them:
+     ~
+     ~  :bufdo set list?       run a command in every loaded buffer
+     ~  :windo echo winnr()    ...or in every window
+     ~
+     ~ :bufdo and :windo show up everywhere in advanced usage. Lesson 6
+     ~ adds :argdo (files) and :cfdo (quickfix results).
+
+  6. TABS = window layouts. Build two workbenches:
+     ~
+     ~  :tabnew                a new tab page with an empty scratch
+     ~  :tabnew 04-<Tab>       open lesson 4 in a brand-new tab
+     ~  gt / gT                next / previous tab
+     ~  2gt                    go to tab 2 (counts work here too)
+     ~  :tabs                  list every tab and its windows
+     ~  :tabclose              close this tab      :tabonly keep only it
+     ~
+     ~ A common layout: one tab for source, one for tests, one for the
+     ~ terminal (Lesson 11), one for netrw. Tabs are cheap; don't hoard
+     ~ splits -- spread work across tabs instead.
+
+  7. Shuffling windows and tabs around:
+     ~
+     ~  Ctrl-W T               move THIS window out to a new tab
+     ~  :tabmove 0             reorder -- :tabm 0 makes it the first
+     ~  :tabdo %s/TODO/DONE/g  run a command in every tab's buffer
+
+  NOTE: Buffers created by :Tutor are scratch copies of lesson files in
+  a temp folder. :bd on them is always safe.
+
+  SUMMARY -- Lesson 2
+
+  ~ :ls :b :bn :bp :b# Ctrl-6     list and switch buffers
+  ~ :e file :vsplit file :bd [!]  load / close buffers
+  ~ :ball :vertical ball          one window per buffer
+  ~ :bufdo :windo                 act on all buffers / windows
+  ~ :tabnew gt gT Ngt :tabs       tab pages are window layouts
+  ~ :tabclose :tabonly :tabmove   manipulate tabs
+  ~ Ctrl-W T                      window -> its own tab
+
+================================================================================

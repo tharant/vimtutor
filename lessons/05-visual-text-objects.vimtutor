@@ -1,0 +1,104 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 5: Visual Modes and Text Objects             =
+================================================================================
+
+  Visual mode is not about "selecting" -- it is about applying an
+  operator to text by MEANING: a word, a paragraph, a quoted string, a
+  block of lines -- without counting characters. Learn the objects and
+  your edits stop being measured in keystrokes.
+
+  1. The three visual modes:
+     ~
+     ~   v          character-wise (the everyday one)
+     ~   V          line-wise
+     ~   Ctrl-V     block-wise -- a RECTANGLE, column edits included
+     ~   gv         reselect the last selection whenever you need it
+     ~
+     ~ Enter each mode on the line below, wave the cursor around, exit
+     ~ with Esc, watch the mode name change in the status line.
+     ~
+     ~      --->  try me here
+
+  2. Block-visual magic -- Ctrl-V pays for this whole lesson:
+     ~
+     ~  Ctrl-V j j j over the leading spaces of the block below makes a
+     ~  4-line rectangle. With it selected:
+     ~
+     ~    I # <Esc>        insert at the START of every line at once
+     ~    u                (undo), then try the rest:
+     ~    A  end<Esc>      append at the END of every line at once
+     ~    c<Esc>           hollow the block: change all lines together
+     ~    ~                flip the case of the whole selection
+     ~    o                move opposite corner, O move opposite side
+     ~    r*               replace every char of the block with *
+     ~
+     ~      ~ alpha one
+     ~      ~ alpha two
+     ~      ~ alpha three
+     ~      ~ alpha four
+
+  3. Visual mode writes its own Ex ranges:
+     ~
+     ~  Select two or three lines with V j, then:
+     ~
+     ~    :sort<Enter>          sorts only the selected lines (built in!)
+     ~    :s/alpha/BETA/<Enter> the range :'<,'> is pre-typed for you
+     ~    :normal A;<Enter>     normal-mode keys per selected line
+     ~    J                     join the selected lines (in V mode)
+     ~
+     ~ Those :'<,'> ranges can also be typed by hand in the command line.
+
+  4. TEXT OBJECTS -- operator + i|a + object:
+     ~
+     ~   i = inner, JUST the object      a = "a-round", object + padding
+     ~
+     ~   iw  aw     word, with or without its trailing space
+     ~   i(  a(     inside / around parentheses   (ib ab are aliases)
+     ~   i{  a{     inside / around a code block (iB aB likewise)
+     ~   i"  a"     inside / around double quotes (' ` too)
+     ~   ip  ap     inside / around a paragraph
+     ~   it  at     inside / around an XML-ish tag (it = inner tag)
+     ~
+     ~  Practice on the line  --->  call(alpha_value, "text here")
+     ~
+     ~    ci(               change everything inside the parentheses
+     ~    da"               delete the string INCLUDING its quotes
+     ~    va(               select around the parens, then u to undo
+     ~    2i)               count UP the nesting: two paren levels in
+     ~
+     ~  The general shape is always: operator, i/a, object. d a p
+     ~  deletes a paragraph, y i " yanks a string's contents -- hundreds
+     ~  of combinations, one grammar.
+
+  5. The dot command, one level up:
+     ~
+     ~  ciwWORD<Esc>   change one word; find the next occurrence with n
+     ~  .              ...and press dot -- the SAME edit again, instantly
+     ~
+     ~ ciw + n + . is often faster than any regex. It is the partner of
+     ~ macros: dot for "again here", @a for "here and the next three".
+
+  6. Bonus -- vim-surround is installed for you (see Lesson 9):
+     ~
+     ~  On the line  --->  "just text"
+     ~
+     ~    cs"'                 change surrounding " to '
+     ~    cs'`<                to backticks, then to tags: c s ' <
+     ~    ds"                  delete the surrounding quotes
+     ~    ysiw"                wrap the word under cursor in quotes
+     ~    S"                   in VISUAL: wrap the selection in "
+     ~
+     ~ Works for (), {}, and t for tags: :help surround when curious.
+
+  SUMMARY -- Lesson 5
+
+  ~ v V Ctrl-V gv          three visual modes + reselect
+  ~ o O                    move the selection's ends
+  ~ I A c ~ r in block mode   column edits that stick together
+  ~ :sort :'<,'>s          visual modes pre-type ranges for you
+  ~ i/a + iw aw i( i{ i" ip it   objects by meaning
+  ~ 2i)                    counts reach through nesting
+  ~ ciw ... n ... .         dot as the lightweight macro
+  ~ cs ds ysiw S            surround: edit the wrapper, not the text
+
+================================================================================

@@ -1,0 +1,94 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 1: Windows and Splits                        =
+================================================================================
+
+  A window is a viewport onto a buffer. A split gives you a second
+  window -- usually the same or a related file at the same time. You
+  will use splits constantly: code on the left, its tests on the right,
+  the file on top and its documentation below.
+
+  1. Your first split, in and out:
+     ~
+     ~  Type :new<Enter> on the line below: a scratch buffer opens below
+     ~  this one. Look, then close it with Ctrl-W c (or :q).
+     ~
+     ~        +---------------------------------------+
+     ~        | lesson 1 (this text)                  |
+     ~        +---------------------------------------+
+     ~        | [No Name]                             |
+     ~        +---------------------------------------+
+
+  2. Vertical splits -- the everyday ones. Practice below:
+     ~
+     ~  :vsplit<Enter>        split left/right showing this buffer twice
+     ~  Ctrl-W w              hop to the other window (w = window)
+     ~  Ctrl-W h / Ctrl-W l   go to the LEFT / RIGHT window
+     ~  :only<Enter>          close every other window (alias Ctrl-W o)
+     ~
+     ~ Split, navigate a few times, then tidy up with :only.
+
+  3. Windows with content:
+     ~
+     ~  :e 03-<Tab>           edit another lesson in THIS window
+     ~  :vsplit 03-<Tab>      ...or in a NEW split instead
+     ~  :new                  a new empty window below (horizontal)
+     ~  :vnew                 a new empty window to the right
+     ~
+     ~ Make a mess: two windows on this lesson plus one on lesson 3.
+     ~ The same buffer may appear in many windows at once. Clean up
+     ~ with :only.
+
+  4. Moving fast between windows (all Ctrl-W chords):
+     ~
+     ~  Ctrl-W h j k l        move left / down / up / right
+     ~  Ctrl-W w              cycle through all windows
+     ~  Ctrl-W p              previous window -- the one you just left
+     ~  2 Ctrl-W w            two windows ahead (counts compose)
+
+  5. Rearranging, all with Ctrl-W:
+     ~
+     ~  H J K L               shove the window hard left/down/up/right
+     ~  r                     rotate window positions
+     ~  x                     exchange this window with the next one
+     ~  T                     tear this window out into a new TAB
+     ~
+     ~ Try Ctrl-W K then Ctrl-W J: you get a banner-style layout. You
+     ~ will meet Ctrl-W T again in Lesson 2.
+
+  6. Sizes:
+     ~
+     ~  Ctrl-W +   Ctrl-W -   grow / shrink the HEIGHT by one line
+     ~  Ctrl-W >   Ctrl-W <   widen / narrow by one column
+     ~  Ctrl-W _              maximize height     Ctrl-W |  max width
+     ~  Ctrl-W =              equalize every split -- the tidy-up key
+     ~  :resize 12            this window exactly 12 lines tall
+     ~  :vertical resize 90   this window exactly 90 columns wide
+     ~
+     ~ Where do NEW splits land? Two options decide:
+     ~        :set splitbelow?    :set splitright?
+     ~ (the trailing ? prints the current value). Your shared config
+     ~ turns both on, so :new and :vnew appear below and to the right,
+     ~ where your eyes already are.
+
+  7. A real workflow, start to finish:
+     ~
+     ~  :vsplit demo/<Enter>   the built-in file explorer (netrw) opens
+     ~                         in the left half -- Lesson 10 teaches it
+     ~  Press v on a file name to open it in the right half (or o for a
+     ~  horizontal split). Hop with Ctrl-W h / Ctrl-W l. Finish with
+     ~  Ctrl-W = to equalize.
+
+  NOTE: Everything in this lesson is plain, built-in Vim -- identical in
+  Vim and Neovim, no plugins involved.
+
+  SUMMARY -- Lesson 1
+
+  ~ :split :vsplit :new :vnew   create windows (Ctrl-W s v n are twins)
+  ~ Ctrl-W h j k l w p          move between windows
+  ~ Ctrl-W H J K L r x T        reposition, rotate, swap, tear to tab
+  ~ Ctrl-W c q o                close / quit / keep only this window
+  ~ Ctrl-W + - = _ | < >        resize and equalize
+  ~ :resize N :vertical resize  exact sizes
+  ~ :set splitbelow splitright  where new splits appear
+
+================================================================================

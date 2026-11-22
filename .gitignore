@@ -1,0 +1,9 @@
+# Editor clutter
+*~
+*.swp
+*.swo
+tags
+
+# Local scratch (setup.sh never writes into the repo, but be safe)
+scratch/
+*.bak

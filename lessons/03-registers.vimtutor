@@ -1,0 +1,90 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 3: Registers -- Yank, Delete, Put            =
+================================================================================
+
+  Every yank (y), delete (d) and change (c) writes its text into a
+  register. The obvious one is the unnamed register, " in :reg. But
+  there are 26 named registers, 10 numbered ones, and a handful of
+  special slots. Knowing which is which turns your clipboard into a
+  precision tool instead of a lottery.
+
+  1. Inspect the machinery:
+     ~
+     ~  Put the cursor on the word  --->  register
+     ~  and yank it with yiw. Now type :reg<Enter> and find the unnamed
+     ~  register (") holding the word. Then note the rules:
+     ~
+     ~  ~ y yank        fills  "  AND  "0   (the yank register)
+     ~  ~ d c           fill   "  AND  "1   (older deletes shift to "2.."9)
+     ~  ~ x s dd cC     on one small piece also fill "-"  (small delete)
+
+  2. The yank register survives intervening deletes:
+     ~
+     ~      --->  survivor
+     ~      --->  deleted
+     ~
+     ~  yiw survivor        ("0 and " = "survivor")
+     ~  j
+     ~  daw                 (" = "deleted", but "0 STILL = "survivor")
+     ~  p                   pastes "deleted" from the unnamed register
+     ~  "0p                 pastes "survivor" from the YANK register
+     ~
+     ~ That is the trick: "0p pastes your last yank no matter how much
+     ~ deleting happened in between. No re-yank, no loss.
+
+  3. Named registers "a-"z -- your own slots:
+     ~
+     ~      --->  alpha beta gamma
+     ~
+     ~  "ayy                yank THIS line into register a
+     ~  "byiw  and  "cyiw   yank beta and gamma into b and c
+     ~  Move to the end of the buffer, on its last line type:
+     ~      "bp<Esc>"cp<Esc>"ap<Esc>
+     ~  and reassemble the words in a new order. Check with :reg abc.
+     ~
+     ~ APPEND versions (capital letter): "Ayy appends ANOTHER LINE to
+     ~ register a instead of replacing it. Collect lines one by one,
+     ~ then paste the lot with "ap -- the classic "build a list" trick.
+
+  4. The blackhole register "_ -- delete without remembering:
+     ~
+     ~  "_diw       deletes a word and writes NOTHING anywhere
+     ~  "_dd        deletes lines without clobbering your paste slot
+     ~
+     ~ Use it when you have valuable text parked in " and still need
+     ~ quick deleting. Deleting should never cost you your clipboard.
+
+  5. The system clipboard registers "+ and "*:
+     ~
+     ~  :echo has('clipboard')        does THIS editor carry them?
+     ~
+     ~  ~ In Neovim they work when a provider is found (xclip /
+     ~  ~ wl-clipboard on Wayland, pbcopy on macOS). :checkhealth tells.
+     ~  ~ In Vim they need a build compiled WITH the X clipboard --
+     ~  ~ Debian's default `vim` package usually lacks it; install the
+     ~  ~ `vim-gtk3` package and /usr/bin/vim regains +clipboard.
+     ~
+     ~  With them working:  "+y copies the selection to the OS clipboard,
+     ~  "+p pastes from it. :set clipboard=unnamed makes " and "+" ONE
+     ~  register (every d/y/p crosses into the OS clipboard). Powerful --
+     ~  and a big muscle-memory change, so flip it consciously.
+
+  6. Ex-mode register commands worth knowing:
+     ~
+     ~  :put a                    paste register a below this line
+     ~  :'<,'>normal "ap          (after V) paste "a at every line
+     ~  :echo @a                  show me what is in register a
+     ~  :help registers<Enter>    the full story when you want it
+
+  SUMMARY -- Lesson 3
+
+  ~ y d c fill " the unnamed      p P paste it back
+  ~ "0                            last yank: "0p survives deleting
+  ~ "1-9  and  "-                 recent big deletes / small deletes
+  ~ "a-"z  "A-"Z                  named slots; capitals APPEND
+  ~ "_                            blackhole: delete without storing
+  ~ "+ "*                         system clipboards (provider/build!)
+  ~ :reg "ap "Ayy :put a          inspect and use registers in Ex mode
+  ~ :set clipboard=unnamed        merge OS clipboard with "
+
+================================================================================

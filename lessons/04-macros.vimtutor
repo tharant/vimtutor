@@ -1,0 +1,106 @@
+================================================================================
+=  VIMTUTOR ADVANCED  --  Lesson 4: Macros -- Recorded Power                  =
+================================================================================
+
+  A macro is a NORMAL MODE recording stored in a register. You record a
+  small edit once, then replay it on similar lines. This is the single
+  biggest productivity leap Vim offers for repetitive edits -- and the
+  reason q is NOT mapped to quit anywhere in this tutor.
+
+  1. The canonical demo -- numbering lines with Ctrl-A:
+     ~
+     ~  The block below has five identical lines. Stand on the digit of
+     ~  the FIRST line, then record:
+     ~
+     ~      ~ item 1
+     ~      ~ item 1
+     ~      ~ item 1
+     ~      ~ item 1
+     ~      ~ item 1
+     ~
+     ~    Step 1:  q a          start recording into register a
+     ~    Step 2:  Ctrl-A       bump 1 -> 2  (on this line only)
+     ~    Step 3:  j            down to the next identically-shaped line
+     ~    Step 4:  q            stop recording
+     ~
+     ~    Step 5:  @a           replay once              (line 2 -> 3)
+     ~    Step 6:  @@           replay the LAST macro    (line 3 -> 4)
+     ~    Step 7:  @@           again                    (line 4 -> 5)
+     ~
+     ~  Ctrl-A increases the number under the cursor (Ctrl-X decreases).
+     ~  The macro is "change this digit, go down" -- which is why it
+     ~  self-propagates. :reg a shows the tiny recording.
+
+  2. Replays with counts -- and a clean slate:
+     ~
+     ~  Undo all of it:  u u u u  or simply  :undo 0<Enter>
+     ~  Stand on the first 1 again and type  4@a<Enter>
+     ~  Counts before @ replay it that many times. 4@a does the whole
+     ~  column in one press.
+
+  3. A text editing macro from start to finish:
+     ~
+     ~  Turn EVERY line below into a checked box: " [x] some words here "
+     ~
+     ~      ~ some words here
+     ~      ~ some words here too
+     ~      ~ yet some words again
+     ~
+     ~  Stand on the first line (column zero), then record exactly:
+
+     ~    q a          record into a
+     ~    I            insert at the first non-blank of THIS line
+     ~    [x]<Space>   type those four characters literally
+     ~    Esc          back to normal mode -- macro steps need it
+     ~    j            down one line, so replays land on the next
+     ~    q            stop
+     ~
+     ~    2@a          ...and the remaining two lines convert at once.
+
+  4. Macros over visual selections with :normal:
+     ~
+     ~  Select the three lines with V (Lesson 5 has the full tour),
+     ~  then run:
+
+     ~    :'<,'>normal @a<Enter>
+
+     ~  :normal plays keys AS IF TYPED, once per selected line -- with
+     ~  @a inside, that applies the macro to any range you like, not
+     ~  just to whatever  j  happens to reach. (gv reselects the last
+     ~  visual selection afterwards.)
+
+  5. Fixing a macro by editing the register:
+     ~
+     ~  Recording is only the START. The macro lives in a register, so
+     ~  you can read and rewrite it:
+
+     ~    :put a<Enter>          paste register a as plain text here
+     ~    Edit that line: change j to 0, or add a second j...
+     ~    :let @a = getline('.')      capture the whole line back
+     ~    @a                          the NEW macro, in action
+     ~
+     ~  (getline('.') works for single-line macros. Multi-line ones you
+     ~  set directly: :let @a = "i[x] \<Esc>j"  -- quote quotes as \".)
+
+  6. Appending to a recording:
+     ~
+     ~  q A          record MORE keys, appended to register a
+     ~  ... q        stop
+     ~
+     ~  @a now does the old steps, then the new ones. Use it when a
+     ~  macro "almost" fits: extend, don't re-record.
+
+  REMEMBER: q starts a recording in normal mode; :q quits a window. Two
+  different verbs, no conflict in this tutor.
+
+  SUMMARY -- Lesson 4
+
+  ~ q{register} ... q     record / stop recording (qA appends)
+  ~ @a  @@  3@a           run it, re-run it, run it N times
+  ~ :'<,'>normal @a       run once per line of a visual range
+  ~ :put a :echo @a       read the raw keystrokes
+  ~ :let @a = getline('.')  rewrite single-line macros after editing
+  ~ :reg                  macros are just registers -- peek any time
+  ~ q is record, :q is quit -- never map q away in a real config
+
+================================================================================
