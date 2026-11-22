@@ -202,5 +202,5 @@ Neovim/after for Vim — your file always wins):
 
 ## License
 
-MIT — same spirit as (nothing to do with, but inspired by) the original vim
-tutorial.
+MIT (the lessons and tooling of this repository; the plugin libraries it
+installs keep their own licenses).

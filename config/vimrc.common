@@ -164,50 +164,59 @@ command! -nargs=1 -bar -bang Theme call s:VimtutorTheme(<q-args>, !empty('<bang>
 " --- 4. plugins via vim-plug (managed in-editor) ------------------------------
 
 " plug.vim is fetched by setup.sh into the tutor tree's autoload/.
-if !exists('*plug#begin')
+" NB: exists('*plug#begin') does NOT resolve autoloads on Neovim, so also
+" check for the file itself (a call to plug#begin() autoloads in both).
+let s:plug_file = g:vimtutor_data . '/autoload/plug.vim'
+let s:plug_found = exists('*plug#begin') || filereadable(s:plug_file)
+if !s:plug_found
   echom 'vimtutor: vim-plug not found -- plugins are off.'
         \ ' Run setup.sh again, or see README (manual step: fetch plug.vim).'
 else
-  call plug#begin(g:vimtutor_plugdir)
+  try
+    call plug#begin(g:vimtutor_plugdir)
 
-  " Completion + LSP client: one engine for both editors. Needs Node 18+.
-  Plug 'neoclide/coc.nvim', {'branch': 'release'}
+    " Completion + LSP client: one engine for both editors. Needs Node 18+.
+    Plug 'neoclide/coc.nvim', {'branch': 'release'}
 
-  " Editor-grade syntax highlighting:
-  if has('nvim')
-    Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
-  else
-    Plug 'sheerun/vim-polyglot'
-  endif
+    " Editor-grade syntax highlighting:
+    if has('nvim')
+      Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+    else
+      Plug 'sheerun/vim-polyglot'
+    endif
 
-  " Status line:
-  if has('nvim')
-    Plug 'nvim-lualine/lualine.nvim'
-  else
-    Plug 'vim-airline/vim-airline'
-    " No powerline glyphs: readable on every stock terminal font.
-    let g:airline_powerline_fonts = 0
-  endif
+    " Status line:
+    if has('nvim')
+      Plug 'nvim-lualine/lualine.nvim'
+    else
+      Plug 'vim-airline/vim-airline'
+      " No powerline glyphs: readable on every stock terminal font.
+      let g:airline_powerline_fonts = 0
+    endif
 
-  " Colorschemes (tokyonight is Neovim-only; gruvbox is universal).
-  Plug 'morhetz/gruvbox'
-  if has('nvim')
-    Plug 'folke/tokyonight.nvim'
-  endif
+    " Colorschemes (tokyonight is Neovim-only; gruvbox is universal).
+    Plug 'morhetz/gruvbox'
+    if has('nvim')
+      Plug 'folke/tokyonight.nvim'
+    endif
 
-  " Editor quality-of-life (small, no config needed):
-  Plug 'tpope/vim-fugitive'    " git: Lesson 11
-  Plug 'tpope/vim-commentary'  " gcc to toggle comments
-  Plug 'tpope/vim-surround'    " cs/ds/ys/S: Lesson 5
-  Plug 'tpope/vim-sleuth'      " infer indentation from each file
+    " Editor quality-of-life (small, no config needed):
+    Plug 'tpope/vim-fugitive'    " git: Lesson 11
+    Plug 'tpope/vim-commentary'  " gcc to toggle comments
+    Plug 'tpope/vim-surround'    " cs/ds/ys/S: Lesson 5
+    Plug 'tpope/vim-sleuth'      " infer indentation from each file
 
-  " Fuzzy finder -- only when its binaries are present.
-  if executable('fzf')
-    Plug 'junegunn/fzf'
-    Plug 'junegunn/fzf.vim'
-  endif
+    " Fuzzy finder -- only when its binaries are present.
+    if executable('fzf')
+      Plug 'junegunn/fzf'
+      Plug 'junegunn/fzf.vim'
+    endif
 
-  call plug#end()
+    call plug#end()
+  catch
+    echom 'vimtutor: vim-plug did not load cleanly: ' . v:exception
+          \ . ' -- re-fetch plug.vim (re-run setup.sh).'
+  endtry
 
   " Friendly first-run nudge, exactly once.
   autocmd VimEnter * ++once

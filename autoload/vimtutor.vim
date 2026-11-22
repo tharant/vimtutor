@@ -137,8 +137,11 @@ function! vimtutor#start(arg) abort
   silent! execute 'lcd' fnameescape(l:dir)
 
   setlocal filetype=vimtutor
-  " Fire our ftplugin/syntax even when the user has filetype machinery
-  " off; the guards inside make double-loads harmless.
+  " NB: ftdetect may already have applied the ftplugin while :tabnew read
+  " the file -- i.e. BEFORE the index marker above existed. Deliberately
+  " load it again now that the marker is set; the guards inside keep this
+  " idempotent, and syntax never reloads twice.
+  silent! unlet b:vimtutor_did_ftplugin
   runtime! ftplugin/vimtutor.vim
   runtime! syntax/vimtutor.vim
 
