@@ -1,0 +1,97 @@
+*vimtutor.txt*   VIMTUTOR ADVANCED -- interactive lessons for Vim and Neovim
+                 Version 1.0
+
+===============================================================================
+CONTENTS                                                     *vimtutor-contents*
+
+  1. Commands ................................. |vimtutor-commands|
+  2. How it works ............................ |vimtutor-about|
+  3. Sandbox details ......................... |vimtutor-sandbox|
+  4. Options ................................. |vimtutor-options|
+  5. Neovim/Vim differences .................. |vimtutor-editors|
+
+===============================================================================
+1. COMMANDS                                                  *vimtutor-commands*
+
+:Tutor [target]
+        Open the interactive lessons. With no argument, the table of
+        contents opens; on |NN| entries <Enter> opens that lesson.
+        {target} can be:
+            a lesson number      :Tutor 3   :Tutor 03
+            a name fragment      :Tutor splits
+            nothing              the index
+        Tab completion lists every lesson either way. The command is
+        defined by this plugin (plugin/vimtutor.vim) and -- because the
+        plugin directory is APPENDED to 'runtimepath' -- it overrides
+        the stock markdown :Tutor that ships with Vim 9 and Neovim.
+
+:TutorClassic [target]
+        The stock interactive tutorial that ships with the editor
+        (delegates to the built-in tutor runtime, `tutor#TutorCmd`).
+        In a plain shell the classic experience is also available as
+        the standalone `vimtutor` binary.
+
+===============================================================================
+2. ABOUT                                                     *vimtutor-about*
+
+Lessons follow the single-screen, tilde-bordered format of the original
+vimtutor, one chapter per file:
+
+  |00| index .............. table of contents, links with <Enter>
+  |01| windows and splits
+  |02| buffers and tabs ... windows vs buffers vs tabs, :ls, :b, tabs
+  |03| registers .......... "0, named, blackhole, clipboards
+  |04| macros ............. q ... q, @@, :normal, editing a register
+  |05| visual and text objects, including block mode and surround
+  |06| search, :s flags, very magic, :global, :vimgrep + quickfix
+  |07| marks, jumplist, command window (q:)
+  |08| folds .............. zf/zo/zc/zM/zR, foldmethod choices
+  |09| your config ........ options that matter, nnoremap, vim-plug,
+                            coc extensions, colorschemes
+  |10| files, :args, :mksession, netrw
+  |11| :term, :!/%, fugitive git
+  |12| coc.nvim .......... completion, LSP diagnostics, rename
+  |13| cheat sheet ....... everything on one page
+
+Every lesson is editor-agnostic; plugin-specific lessons (9, 11, 12)
+match the configuration that setup.sh installs. Read |vimtutor-options|
+first if you wire the plugin into an existing config by hand.
+
+===============================================================================
+3. SANDBOX DETAILS                                           *vimtutor-sandbox*
+
+Like the original tutor, lessons open from a COPY in a temporary
+directory (created once per editor session and reused). Practice edits
+land in the copy; :q! throws every change away, and even :w only ever
+writes the scratch copies. The scratch directory becomes the working
+directory of the lesson window (window-local, :lcd), so :e, :find,
+:vimgrep, netrw and the lessons' own instructions all resolve inside
+the sandbox: this is why buffer navigation exercises can hop between
+real lesson files.
+
+===============================================================================
+4. OPTIONS                                                  *vimtutor-options*
+
+g:vimtutor_home                                     *g:vimtutor_home*
+        Path to the runtime tree (defaults to the repository root, the
+        parent of plugin/vimtutor.vim). Lesson files are looked up in
+        "{home}/lessons".
+
+g:vimtutor_open                                      *g:vimtutor_open*
+        How the first lesson opens: "tab" (default, keeps your layout)
+        or "split" (a regular window).
+
+===============================================================================
+5. NEOVIM/VIM DIFFERENCES                                    *vimtutor-editors*
+
+The command and lessons behave identically in both editors. The only
+editor-sensitive pieces live in the config the setup script installs
+(config/vimrc.common):
+
+- syntax highlighting is vim-polyglot on Vim, nvim-treesitter on Neovim
+- the status line is vim-airline on Vim, lualine on Neovim
+- tokyonight is a Neovim-only colorscheme; gruvbox works on both
+- coc.nvim (completion/LSP) and fzf.vim (if present) run on both
+
+===============================================================================
+vim:tw=78:ts=8:ft=help:norl:
