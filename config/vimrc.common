@@ -1,0 +1,311 @@
+" ============================================================================
+"  VIMTUTOR ADVANCED -- shared configuration for Vim 9+ and Neovim 0.10+
+"
+"  This file is SOURCED by ~/.vimrc and by ~/.config/nvim/init.vim (both
+"  created by setup.sh), so one configuration serves both editors. It is
+"  written to be safe WITHOUT any plugins: every plugin-specific block is
+"  guarded, so it degrades to a plain, comfortable editor until
+"  :PlugInstall has run. Edit freely -- it is your config; setup.sh never
+"  rewrites it after first creation.
+"
+"  Layout of this file:
+"    1. plugin-less defaults (options that matter)
+"    2. your keys: leader + mappings
+"    3. colorscheme handling (:Theme)
+"    4. plugins via vim-plug, guarded per editor
+"    5. per-plugin configuration (coc.nvim, status line, treesitter, fzf)
+" ============================================================================
+
+" --- 0. make this file self-sufficient --------------------------------------
+" The repo root (parent of config/) is put on runtimepath if missing, so
+" :Tutor works even when sourced by hand.
+
+let g:vimtutor_data = get(g:, 'vimtutor_data', expand('~/.local/share/vimtutor'))
+let g:vimtutor_plugdir = get(g:, 'vimtutor_plugdir', g:vimtutor_data . '/plugged')
+
+let s:tutor_home = fnamemodify(expand('<sfile>:p:h:h'), ':p:h')
+if stridx(&runtimepath, s:tutor_home) == -1
+  execute 'set runtimepath^=' . fnameescape(s:tutor_home)
+endif
+
+" --- 1. options that matter --------------------------------------------------
+
+if !has('nvim')
+  set encoding=utf-8
+endif
+
+filetype plugin indent on
+syntax on
+
+" Buffers switch without a save prompt; history survives restarts.
+set hidden
+try
+  call mkdir(g:vimtutor_data . '/undo', 'p')
+  let &undodir = g:vimtutor_data . '/undo//'
+catch
+endtry
+if isdirectory(expand(&undodir))
+  set undofile
+endif
+
+" Layout: split where your eyes are; keep context at the edges.
+set splitbelow splitright
+set scrolloff=8
+set cursorline
+set number relativenumber
+set signcolumn=yes  " diagnostics reserve their gutter (coc likes this)
+
+" Search the way you meant it: case-insensitive until CamelCase.
+set incsearch hlsearch ignorecase smartcase
+
+" Command line niceties.
+set wildmenu
+set wildmode=longest:full,full
+set wildignore+=*.o,*.obj,*.pyc,*.so,*~,node_modules,.git,.zig-cache
+set pumheight=15
+
+" :find anywhere under the project root (Lesson 10).
+set path+=**
+
+" Real typing defaults; vim-sleuth adapts per file when installed.
+set backspace=indent,eol,start
+set tabstop=4 shiftwidth=4 expandtab
+set smartindent
+set breakindent showbreak=..
+if !has('nvim')
+  set nolazyredraw
+endif
+
+" Input and feedback.
+set mouse=a
+set timeout timeoutlen=500 ttimeoutlen=10
+set updatetime=300
+if has('nvim')
+  set inccommand=split
+endif
+
+" True color where the terminal promises it (schemes like tokyonight
+" are unusable otherwise).
+let s:tgc = (exists('$COLORTERM') && $COLORTERM =~# 'truecolor\|24bit')
+      \ || (exists('$KITTY_WINDOW_ID') || exists('$WEZTERM_PANE'))
+if has('termguicolors') && s:tgc
+  set termguicolors
+endif
+
+" A decent bare status line; airline/lualine replace it when installed.
+set laststatus=2
+set statusline=%<\ %f\ %y\ %m%r%=%-10.(%l,%c%V%)\ %P
+
+" --- 2. your keys ------------------------------------------------------------
+
+let g:mapleader = ' '
+let g:maplocalleader = ','
+
+" Files and windows
+nnoremap <silent> <leader>w    :write<CR>
+nnoremap <silent> <leader>x    :x<CR>
+nnoremap <silent> <leader>q    :quit<CR>      " close THIS window
+nnoremap <silent> <leader>v    :vsplit<CR>
+nnoremap <silent> <leader>s    :split<CR>
+nnoremap <silent> <leader>=    <C-W>=         " equalize splits
+
+" Tabs and buffers
+nnoremap <silent> <leader>t    :tabnew<CR>
+nnoremap <silent> <leader>bl   :ls<CR>
+nnoremap <silent> <leader>bb   :buffer<Space>
+nnoremap <silent> <leader>e    :Explore<CR>
+
+" Search niceties
+nnoremap <silent> <leader>h    :nohlsearch<CR>
+
+" --- 3. colorschemes ----------------------------------------------------------
+
+" Default theme per editor; override in the line above this comment block
+" or with :Theme<name>!  (the bang writes the choice back to this file).
+let g:vimtutor_theme = get(g:, 'vimtutor_theme', has('nvim') ? 'tokyonight' : 'gruvbox')
+
+function! s:VimtutorTheme(name, persist) abort
+  try
+    execute 'colorscheme' fnameescape(a:name)
+    let g:vimtutor_applied_theme = a:name
+  catch /^Vim\%((\a\+)\)\=:E/
+    echohl WarningMsg
+    echom "vimtutor: colorscheme '" . a:name . "' unavailable"
+          \ . " -- is it installed? (:PlugStatus)"
+    echohl None
+    return
+  endtry
+  if a:persist
+    let l:path = s:tutor_home . '/config/vimrc.common'
+    let l:done = 0
+    if filereadable(l:path) && filewritable(l:path)
+      let l:lines = readfile(l:path)
+      for l:idx in range(len(l:lines))
+        if l:lines[l:idx] =~# 'let\s*g:vimtutor_theme'
+          let l:lines[l:idx] = "let g:vimtutor_theme = '" . a:name . "'"
+          let l:done = 1
+          break
+        endif
+      endfor
+      if !l:done
+        call add(l:lines, '')
+        call add(l:lines, "let g:vimtutor_theme = '" . a:name . "'")
+      endif
+      call writefile(l:lines, l:path)
+    else
+      echom 'vimtutor: cannot persist theme to ' . l:path
+            \ . '; applied for this session only'
+    endif
+  endif
+endfunction
+
+command! -nargs=1 -bar -bang Theme call s:VimtutorTheme(<q-args>, !empty('<bang>'))
+
+" --- 4. plugins via vim-plug (managed in-editor) ------------------------------
+
+" plug.vim is fetched by setup.sh into the tutor tree's autoload/.
+if !exists('*plug#begin')
+  echom 'vimtutor: vim-plug not found -- plugins are off.'
+        \ ' Run setup.sh again, or see README (manual step: fetch plug.vim).'
+else
+  call plug#begin(g:vimtutor_plugdir)
+
+  " Completion + LSP client: one engine for both editors. Needs Node 18+.
+  Plug 'neoclide/coc.nvim', {'branch': 'release'}
+
+  " Editor-grade syntax highlighting:
+  if has('nvim')
+    Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+  else
+    Plug 'sheerun/vim-polyglot'
+  endif
+
+  " Status line:
+  if has('nvim')
+    Plug 'nvim-lualine/lualine.nvim'
+  else
+    Plug 'vim-airline/vim-airline'
+    " No powerline glyphs: readable on every stock terminal font.
+    let g:airline_powerline_fonts = 0
+  endif
+
+  " Colorschemes (tokyonight is Neovim-only; gruvbox is universal).
+  Plug 'morhetz/gruvbox'
+  if has('nvim')
+    Plug 'folke/tokyonight.nvim'
+  endif
+
+  " Editor quality-of-life (small, no config needed):
+  Plug 'tpope/vim-fugitive'    " git: Lesson 11
+  Plug 'tpope/vim-commentary'  " gcc to toggle comments
+  Plug 'tpope/vim-surround'    " cs/ds/ys/S: Lesson 5
+  Plug 'tpope/vim-sleuth'      " infer indentation from each file
+
+  " Fuzzy finder -- only when its binaries are present.
+  if executable('fzf')
+    Plug 'junegunn/fzf'
+    Plug 'junegunn/fzf.vim'
+  endif
+
+  call plug#end()
+
+  " Friendly first-run nudge, exactly once.
+  autocmd VimEnter * ++once
+        \ if empty(globpath(g:vimtutor_plugdir, '*'))
+        \ |   echom 'vimtutor: plugins not installed yet -- run :PlugInstall'
+        \ | endif
+
+  " Apply the default theme now that colorschemes are on the rtp.
+  autocmd VimEnter * ++once call s:VimtutorTheme(g:vimtutor_theme, 0)
+endif
+
+" --- 5. per-plugin configuration ----------------------------------------------
+
+" coc.nvim: completion, LSP, diagnostics (Lesson 12). Keymaps appear only
+" when the plugin is actually installed, so Tab keeps working meanwhile.
+if isdirectory(g:vimtutor_plugdir . '/coc.nvim')
+  " Suggested extensions auto-installed at startup (needs node).
+  if executable('node')
+    let g:coc_global_extensions =
+          \ get(g:, 'coc_global_extensions', ['coc-json', 'coc-tsserver'])
+  endif
+
+  " Navigation (Lesson 12)
+  nmap <silent> gd <Plug>(coc-definition)
+  nmap <silent> gy <Plug>(coc-type-definition)
+  nmap <silent> gi <Plug>(coc-implementation)
+  nmap <silent> gr <Plug>(coc-references)
+  nmap <silent> [g <Plug>(coc-diagnostic-prev)
+  nmap <silent> ]g <Plug>(coc-diagnostic-next)
+
+  nnoremap <silent> K :call <SID>ShowDocumentation()<CR>
+  function! s:ShowDocumentation() abort
+    try
+      call CocActionAsync('doHover')
+    catch
+      " No hover provider for this buffer (or coc absent right now).
+      execute 'help' expand('<cword>')
+    endtry
+  endfunction
+
+  " Refactor
+  nmap <silent> <leader>rn <Plug>(coc-rename)
+  nmap <silent> <leader>ac <Plug>(coc-codeaction-cursor)
+  nmap <silent> <leader>qf <Plug>(coc-fix-current)
+  xmap <silent> <leader>f  <Plug>(coc-format-selected)
+
+  " Completion popup keys (coc#pum): Tab accepts, Shift-Tab steps back,
+  " Ctrl-Space asks for completions.
+  inoremap <silent><expr> <TAB>
+        \ coc#pum#visible() ? coc#pum#confirm() : "\<Tab>"
+  inoremap <silent><expr> <S-TAB>
+        \ coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+  inoremap <silent><expr> <c-space> coc#refresh()
+endif
+
+" treesitter (Neovim): highlight a practical language set.
+if has('nvim') && isdirectory(g:vimtutor_plugdir . '/nvim-treesitter')
+  lua << EOTS
+  local ok, ts = pcall(require, 'nvim-treesitter.configs')
+  if ok then
+    ts.setup({
+      ensure_installed = { 'bash', 'c', 'lua', 'markdown', 'markdown_inline',
+                           'python', 'query', 'vim', 'vimdoc' },
+      highlight = { enable = true },
+      indent = { enable = true },
+    })
+  end
+EOTS
+endif
+
+" lualine (Neovim status line) ships with sane defaults; just make it
+" feel like the vim counterpart.
+if has('nvim') && isdirectory(g:vimtutor_plugdir . '/lualine.nvim')
+  lua << EOLUA
+  local ok, lualine = pcall(require, 'lualine')
+  if ok then
+    lualine.setup({
+      options = {
+        icons_enabled = false,          -- no Nerd Font required
+        section_separators = '',
+        component_separators = '|',
+      },
+    })
+  end
+EOLUA
+endif
+
+" fzf (both editors, if the binary exists): files + content, fast.
+if isdirectory(g:vimtutor_plugdir . '/fzf.vim')
+  nnoremap <silent> <leader>ff :Files<CR>
+  nnoremap <silent> <leader>fg :Rg<CR>
+endif
+
+" ============================================================================
+"  Notes for hands-on readers (Lesson 9 is a guided tour of this file):
+"  - :h options          every option explained in the built-in manual
+"  - :options            browse all settings interactively
+"  - :source $MYVIMRC    reload after editing
+"  - :PlugInstall        install every :Plug line above
+"  - :CocInstall coc-pyright   add a language server for your language
+" ============================================================================

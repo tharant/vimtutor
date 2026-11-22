@@ -7,3 +7,6 @@ tags
 # Local scratch (setup.sh never writes into the repo, but be safe)
 scratch/
 *.bak
+
+# Downloaded by setup.sh in dev/link installs (vendored plug.vim)
+autoload/plug.vim
