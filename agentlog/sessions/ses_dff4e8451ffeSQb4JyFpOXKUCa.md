@@ -2,16 +2,16 @@
 
 - session: `ses_dff4e8451ffeSQb4JyFpOXKUCa`
 - project dir: ` ~/development/personal/vimtutor`
-- started: 2026-11-22 00:39:21Z · last activity: 2026-11-22 01:12:52Z
+- started: 2026-11-22 00:39:21Z · last activity: 2026-11-22 01:15:42Z
 - model: `ollama-cloud/glm-5.3-flash` · agent: `build`
-- tokens: in=285861 out=211994 reasoning=0 cache r=25298944/w=0 · cost:  <cost> · outcome: `succeeded`
-- messages: 163
+- tokens: in=287632 out=213668 reasoning=0 cache r=25808768/w=0 · cost:  <cost> · outcome: `succeeded`
+- messages: 167
 
 Rendered by `scripts/export-agent-log` from `opencode session export`. Tool outputs are capped for readability; the full fidelity data (every input and byte of output) is in the paired `.jsonl` file.
 
 ---
 
-_2 user prompts, 157 assistant turns, 163 messages total (incl. events)._
+_3 user prompts, 159 assistant turns, 167 messages total (incl. events)._
 
 ## 1. USER — 2026-11-22 00:39:21Z
 
@@ -11799,3 +11799,76 @@ _extras: exit=0, truncated=False_
 last message type: assistant | content blocks: ['reasoning', 'text', 'tool']
 
 ```
+
+## 164. ASSISTANT — 2026-11-22 01:12:50Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; cost  <cost>;  tokens <hidden>; finish `tool-calls` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; cost  <cost>;  tokens <hidden>; finish `tool-calls`_
+
+### Model reasoning
+
+Hmm — `git status --porcelain -- agentlog | wc -l` = 3, not 0! Three lines of pending agentlog changes even after the export ran during the amend. What changed? The last export happened during the amend hook, staged by the hook, committed. Then I ran the exporter once more NOW — and something changed again? What could have landed in the transcript between the hook's export (inside amend) and now? MY PREVIOUS tool call (the one that ran exporter + ran the amend) — wait, that tool call ran the hook INSIDE it; the amend hook's export captured messages up to that point including... the amend tool call itself? No — the amend tool call was in progress; its message records the SHELL COMMAND — the export ran as a subprocess within that shell command — the message is only CREATED when the tool call completes (after the shell finishes). So the amend's export could NOT see its own tool call message. My next tool call (this one) triggered the session to record the previous call — so the export I just ran picked it up → 3 changes: jsonl meta line + appended last message + maybe md additions... wait wc -l 3 = three files modified (README.md, .md, .jsonl each shown as one line in porcelain).
+
+So: the working tree now has a small uncommitted delta (recording the amend tool call). This is the inherent convergence lag: each export captures everything up to just before the export's own parent tool call completes; the NEXT export catches it. The committed log will always be exactly one tool-call behind the live session at export time... but since the LAST thing I do in a turn is reply (whose message only exists after the turn ends), the truly-final state gets captured at the NEXT commit/turn.
+
+Options: (a) leave the small delta uncommitted (working tree dirty — ugly; next code commit sweeps it, but "tree clean" is nicer now); (b) run exporter + amend AGAIN — but each amend also can't capture itself (converged except the previous call already captured; a second amend's hook export would capture the FIRST export call... wait, my just-run export WAS a tool call that completed → next amend's export catches it → tree clean-ish? Then the second amend call itself isn't captured. There will ALWAYS be at least one trailing tool call uncommitted (the exporter run itself is a session event). True convergence cannot be reached while the session is live — the log is a snapshot at commit time, complete up to that instant. That's the correct, honest semantic: "the log contains everything up to the moment the commit was created."
+
+So for closing this turn cleanly: stage the pending delta and amend once more? That amend's hook export captures my current exporter call + the diff-check call, leaving only the final amend call uncaptured → tree mostly clean, one tool call behind. The user's goal is "log at every commit" — snapshots at commit instants — not "the log contains the commit operation itself."
+
+Decision: do ONE more fold-in amend (captures the current trailing delta incl. the message-count updates), then close the turn with the summary WITHOUT further shell calls (so the final tool call lag is minimal: the amend itself). Actually — anything I run after the amend (like a final verification) re-dirties. So: amend (hook auto-exports + stages + commits), then write the summary as pure text with NO more tool calls. The trailing uncommitted residue after that is exactly the amend tool call's own record (~1 line) — documented behavior; next turn's first commit captures it. Good enough and honest.
+
+Then write the final summary: infra overview, how it works, the rule, caveats (lag of one tool call, volatile fields, secrets note), and next steps (push, placeholders). Keep it tight.
+
+### Reply
+
+Expected behavior, worth noting precisely: the exporter running *inside* a commit can never capture its own parent tool call (it only exists after the call completes), so there's always exactly one trailing session event after the last commit. One final amend to sweep the current delta; then the summary, with no more tool calls:
+
+#### Tool `shell` — `completed`
+_call id: `call_l4ysum7a`_
+_extras: exit=0, truncated=False_
+**Input**
+```json
+{
+ "command": "cd  ~/development/personal/vimtutor && git add -A agentlog && git commit --amend --no-edit -q >/dev/null 2>&1; echo \"amend2 exit=$?\"; git log --oneline -1; git status --porcelain | wc -l"
+}
+```
+**Output**
+```
+amend2 exit=0
+af9432d feat: agent session log infrastructure (exporter, pre-commit hook, rule)
+0
+
+```
+
+## 165. ASSISTANT — 2026-11-22 01:12:57Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; cost  <cost>;  tokens <hidden>; finish `stop` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; cost  <cost>;  tokens <hidden>; finish `stop`_
+
+### Reply
+
+Infrastructure is complete and the log is self-sustaining. Here's the overview you didn't get yet — the last turn ended at the commit step:
+
+## What was built
+
+**Your assumption was right, with one refinement.** opencode v2.2.7 stores sessions in a 3 GB SQLite DB (`~/.local/share/opencode/opencode.db`, tables `session_v2`/`session_message`/`session_part`), but the *rich* transcript — reasoning blocks, full tool inputs/outputs — is best pulled through the official CLI, `opencode session export <id>`, which talks to the running background service. The exporter uses the DB **read-only** for session discovery (directory-prefix match on this project, BFS through subagent children, CLI fallback) and the CLI for content. Nothing ever writes to opencode's data.
+
+**`scripts/export-agent-log`** — renders two artifacts per session under `agentlog/`:
+- `sessions/<id>.md` — the readable narrative: every user prompt, every model-reasoning block, every tool call with input, command output, exit code, truncation flag, and the assistant's replies, with token/cost headers. Tool outputs capped at 3000 chars (`AGENTLOG_MD_MAX=0` to disable).
+- `sessions/<id>.jsonl` — **verbatim**: meta line + one JSON line per message, full fidelity, no caps.
+- `agentlog/README.md` — regenerated index ("do not edit" instructions + the rule pointer).
+
+It's deterministic (no wall-clock stamps) and prunes artifacts of sessions gone server-side. This session's history is already committed: 11700+ lines of narrative, 1.05 MB of verbatim JSONL, every lesson write, test run, and debug step included.
+
+**The rule + teeth.** `AGENTS.md` makes it mandatory — regenerate before every commit, fold the delta into that commit, never hand-edit `agentlog/`, never bypass the hook — and `CLAUDE.md` imports it. Enforcement is mechanical: `core.hooksPath → .githooks/pre-commit` runs the exporter on *every* commit, stages changes, and **fails the commit** if the opencode service is unreachable (exit 4 "no opencode" skips quietly in foreign environments). Commits from any tool (or a human) get the same treatment.
+
+## Two honest caveats, now documented in AGENTS.md
+
+1. **One-event lag is inherent**: the exporter inside a commit can't capture its own parent tool call (it completes after the export). The log is therefore "everything up to the instant of the commit" — the next commit sweeps the residue. Diffs converge to append-mostly; the three legitimate in-place rewrites (JSONL meta line with live totals, the final in-flight assistant message, index stats) are called out so anything else is a genuine red flag.
+2. **Verbatim means verbatim**: secrets typed in a session are committed as-is — the index warns about it.
+
+Current state: tip `af9432d` on `feat/advanced-vimtutor`, working tree clean, 7 commits total. Remaining before publishing: replace `YOUR-GITHUB-USERNAME` in `setup.sh` + README, then push — and note that a 3 GB DB with two 3 GB `.bak` copies sits in `~/.local/share/opencode/`; I left all of them untouched since they predate this project.
+
+## 166. IDLE — 2026-11-22 01:13:01Z
+
+> session event: {"outcome": "succeeded"}
+
+## 167. USER — 2026-11-22 01:15:40Z
+
+commit once more so we have those two caveats in the git history, then consider what maight be in this repo that shouldn't be published; I wish to host this project on Github for others to use and don't want anything system-specific or personal in the repo.
