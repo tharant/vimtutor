@@ -1,0 +1,44 @@
+#!/bin/sh
+# Pre-commit hook: refresh the agent session log and stage any changes, so
+# every commit in this repository ships with an up-to-date log.
+# Rule: AGENTS.md ("Agent session log").
+# Installed with:  git config core.hooksPath .githooks
+set -u
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 1
+EX="$ROOT/scripts/export-agent-log"
+
+if [ ! -x "$EX" ]; then
+  echo "[pre-commit] scripts/export-agent-log missing; skipping agent log" >&2
+  exit 0
+fi
+
+if ! command -v opencode >/dev/null 2>&1 \
+  && [ ! -x "$HOME/.opencode/bin/opencode" ]; then
+  echo "[pre-commit] opencode not installed; skipping agent log (see AGENTS.md)" >&2
+  exit 0
+fi
+
+OUT="$("$EX" --quiet 2>&1)"
+RC=$?
+case "$RC" in
+  0)
+    if git -C "$ROOT" status --porcelain -- agentlog | grep -q .; then
+      git -C "$ROOT" add -A agentlog
+      echo "[pre-commit] agent session log refreshed and staged:"
+      echo "$OUT" | sed 's/^/    /'
+    fi
+    exit 0
+    ;;
+  4)
+    echo "[pre-commit] opencode unavailable; skipping agent log export" >&2
+    exit 0
+    ;;
+  *)
+    echo "[pre-commit] agent log export FAILED (exit $RC); commit aborted." >&2
+    echo "$OUT" >&2
+    echo "Fix the opencode service ('opencode service restart') and retry." >&2
+    echo "Never skip or disable this hook (see AGENTS.md)." >&2
+    exit 1
+    ;;
+esac

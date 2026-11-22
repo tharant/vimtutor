@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""export-agent-log -- commit-friendly export of the opencode session log.
+
+Pulls the full interactive history (user prompts, assistant replies, model
+reasoning, and every tool call with its input/output) for sessions belonging
+to this project from opencode, and renders two artifacts per session:
+
+    agentlog/sessions/<session-id>.md      human-readable narrative
+    agentlog/sessions/<session-id>.jsonl   one verbatim JSON per message
+
+plus a regenerated index at agentlog/README.md.
+
+Data flow:
+    discovery : the opencode SQLite store (read-only) finds sessions by
+                project directory prefix, including subagent children
+                (session_v2 table). Falls back to `opencode session list`
+                when the database is unreadable.
+    content   : `opencode session export <session-id>` -- the official CLI
+                (talks to the running background service). No DB schema
+                coupling for content.
+
+Contract used by .githooks/pre-commit and AGENTS.md:
+    exit 0  success (files written, or nothing to do)
+    exit 4  opencode is not installed/running in this environment
+            (hook may skip quietly; other error codes fail hard)
+
+The output is deterministic (no wall-clock stamps), so re-running this
+script only produces diffs when the transcript actually grew. The log is
+VERBATIM: never paste secrets into a session that will be committed by
+this tool.
+
+Usage:
+    scripts/export-agent-log [--output DIR] [--project DIR] [--quiet]
+Env:
+    AGENTLOG_MD_MAX    cap per fenced block in .md rendering (0 = no cap;
+                       default 3000; full text always stays in .jsonl)
+    AGENTLOG_JSONL_MAX cap per message JSON line in bytes (0 = full;
+                       default 0)
+"""
+
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+SCHEMA = "opencode-agentlog/1"
+GENERATOR = "scripts/export-agent-log"
+DEFAULT_OUT = "agentlog"
+DEFAULT_MD_MAX = 3000
+DEFAULT_JSONL_MAX = 0
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_NO_OPENCODE = 4
+
+
+def log(msg, quiet=False):
+    if not quiet:
+        print(f"[agentlog] {msg}", file=sys.stderr)
+
+
+def die(msg, code=EXIT_ERROR):
+    print(f"[agentlog] {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def find_opencode():
+    here = os.path.join(os.path.expanduser("~"), ".opencode", "bin", "opencode")
+    for cand in (here, "/usr/local/bin/opencode"):
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return cand
+    return None
+
+
+def find_opencode_db():
+    """Path to the opencode SQLite store (XDG data home), if it exists."""
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.expanduser(
+        "~/.local/share"
+    )
+    db = os.path.join(data_home, "opencode", "opencode.db")
+    return db if os.path.isfile(db) else ""
+
+
+def iso(ms):
+    if not isinstance(ms, (int, float)) or ms <= 0:
+        return "?"
+    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).strftime(
+        "%Y-%m-%d %H:%M:%SZ"
+    )
+
+
+# ----------------------------------------------------------------------------
+# discovery
+# ----------------------------------------------------------------------------
+
+def discover_via_db(project_dir):
+    """Return [{id, parent_id, slug, title, time_created, directory}] from
+    session_v2 (sessions whose directory starts with the project dir),
+    including subagent children. Read-only; never writes."""
+    rows = []
+    db = find_opencode_db()
+    if not db:
+        return rows
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+        cur = con.cursor()
+        like = project_dir.rstrip("/") + "%"
+        children_of = [project_dir]
+        # BFS down the child chain by directory prefix.
+        seen = {}
+        for depth in range(8):  # safety depth
+            placeholders = ",".join("?" * len(children_of))
+            parents = ",".join("?" * len(children_of))
+            cur.execute(
+                "SELECT id, parent_id, slug, title, time_created, directory "
+                "FROM session_v2 "
+                "WHERE directory LIKE ? OR parent_id IN (" + parents + ") "
+                "ORDER BY time_created",
+                (like, *children_of),
+            )
+            new = []
+            for rid, pid, slug, title, tc, directory in cur.fetchall():
+                if rid not in seen:
+                    seen[rid] = True
+                    new.append(
+                        {
+                            "id": rid,
+                            "parent_id": pid,
+                            "slug": slug,
+                            "title": title,
+                            "time_created": tc,
+                            "directory": directory,
+                        }
+                    )
+            if not new:
+                break
+            rows.extend(new)
+            children_of = [r["id"] for r in new]
+        con.close()
+    except Exception as exc:  # noqa: BLE001 -- degrade to CLI discovery
+        log(f"sqlite discovery unavailable ({exc}); using CLI fallback")
+        return []
+    return rows
+
+
+def discover_via_cli(opencode_bin):
+    """Fallback: parse `opencode session list` (runs against the service
+    for the CURRENT working directory)."""
+    rows = []
+    try:
+        out = subprocess.run(
+            [opencode_bin, "session", "list"],
+            capture_output=True, text=True, timeout=60, check=False,
+        ).stdout
+        for line in out.splitlines():
+            bits = line.split("\t")
+            if bits and bits[0].startswith("ses_"):
+                rows.append(
+                    {"id": bits[0], "parent_id": None, "slug": "",
+                     "title": bits[1] if len(bits) > 1 else "",
+                     "time_created": 0, "directory": os.getcwd()}
+                )
+    except Exception as exc:  # noqa: BLE001
+        log(f"CLI discovery failed: {exc}")
+    return rows
+
+
+# ----------------------------------------------------------------------------
+# content
+# ----------------------------------------------------------------------------
+
+def export_session(opencode_bin, session_id):
+    """Via the official CLI (service must be running). Returns the parsed
+    export payload: {'info': {...}, 'messages': [...]}."""
+    proc = subprocess.run(
+        [opencode_bin, "session", "export", session_id],
+        capture_output=True, text=True, timeout=300, check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"export exited {proc.returncode}: {proc.stderr.strip()[:300]}"
+        )
+    return json.loads(proc.stdout)
+
+
+# ----------------------------------------------------------------------------
+# rendering
+# ----------------------------------------------------------------------------
+
+def truncate(text, limit):
+    if not isinstance(text, str) or limit <= 0 or len(text) <= limit:
+        return text, False
+    return (
+        text[:limit] + f"\n\n[... truncated: {limit} of {len(text)} chars; "
+        "full text is in the matching .jsonl file]",
+        True,
+    )
+
+
+def fence(text, lang=""):
+    return f"```{lang}\n{text}\n```"
+
+
+def render_tool_block_md(session_base, tool, md_max):
+    name = tool.get("name", "?")
+    state = tool.get("state") or {}
+    status = state.get("status", "unknown")
+    lines = [f"#### Tool `{name}` — `{status}`"]
+
+    meta = state.get("metadata") or {}
+    extras = {}
+    for key in ("exit", "truncated"):
+        if key in meta:
+            extras[key] = meta[key]
+    tool_id = tool.get("id", "")
+    if tool_id:
+        lines.append(f"_call id: `{tool_id}`_")
+    if extras:
+        pretty = ", ".join(f"{k}={v}" for k, v in extras.items())
+        lines.append(f"_extras: {pretty}_")
+
+    inp = state.get("input")
+    if inp is not None:
+        body, _ = truncate(json.dumps(inp, indent=1, ensure_ascii=False), md_max)
+        lines.append("**Input**")
+        lines.append(fence(body, "json"))
+
+    content = state.get("content") or []
+    if isinstance(content, list):
+        for i, item in enumerate(content):
+            text = item.get("text", "") if isinstance(item, dict) else str(item)
+            label = "Output" if len(content) == 1 else f"Output part {i + 1}"
+            body, truncated = truncate(text, md_max)
+            lines.append(f"**{label}**" + (" _(see note below)_" if truncated else ""))
+            lines.append(fence(body))
+    elif isinstance(content, str) and content:
+        body, truncated = truncate(content, md_max)
+        lines.append("**Output**")
+        lines.append(fence(body))
+    return "\n".join(lines)
+
+
+def render_message_md(msg, idx, session_id, md_max):
+    mtype = msg.get("type", "unknown")
+    time_created = (msg.get("time") or {}).get("created")
+    head = f"## {idx}. {mtype.upper()} — {iso(time_created)}"
+
+    extras = []
+    if mtype == "assistant":
+        model = msg.get("model") or {}
+        extras.append(
+            f"model `{model.get('providerID', '?')}/{model.get('id', '?')}`"
+        )
+        extras.append(f"agent `{msg.get('agent', 'build')}`")
+        if msg.get("cost") is not None:
+            extras.append(f"cost ${msg.get('cost'):.6f}")
+        toks = msg.get("tokens") or {}
+        if toks:
+            extras.append(
+                "tokens "
+                f"in={toks.get('input', '?')} out={toks.get('output', '?')}"
+            )
+        extras.append(f"finish `{msg.get('finish', '?')}`")
+    head_line = head + (f"  <!-- {'; '.join(extras)} -->" if extras else "")
+
+    out = [head_line]
+    if extras:
+        out.append("_" + "; ".join(extras) + "_")
+
+    if mtype == "user":
+        text = msg.get("text", "")
+        if text:
+            out.append("")
+            out.append(text)
+        files = msg.get("files")
+        if files:
+            body, _ = truncate(json.dumps(files, ensure_ascii=False), md_max)
+            out.append("")
+            out.append(f"> attached files: {body}")
+        agents = msg.get("agents")
+        if agents:
+            body, _ = truncate(json.dumps(agents, ensure_ascii=False), md_max)
+            out.append("")
+            out.append(f"> agents: {body}")
+        return "\n".join(out)
+
+    if mtype in ("synthetic", "idle"):
+        detail = json.dumps(
+            {k: v for k, v in msg.items() if k not in ("id", "time", "type")},
+            ensure_ascii=False,
+        )
+        body, _ = truncate(detail, 500)
+        out.append("")
+        out.append(f"> session event: {body}")
+        return "\n".join(out)
+
+    # assistant
+    for block in msg.get("content") or []:
+        btype = block.get("type")
+        if btype == "reasoning":
+            text = block.get("text", "")
+            if not text.strip():
+                continue
+            out.append("")
+            out.append("### Model reasoning")
+            out.append("")
+            out.append(text)
+        elif btype == "tool":
+            out.append("")
+            out.append(render_tool_block_md(session_id, block, md_max))
+        elif btype == "text":
+            text = block.get("text", "")
+            if text.strip():
+                out.append("")
+                out.append("### Reply")
+                out.append("")
+                out.append(text)
+        else:
+            detail = json.dumps(block, ensure_ascii=False)
+            body, _ = truncate(detail, 500)
+            out.append("")
+            out.append(f"### {btype or 'unknown'} block")
+            out.append(fence(body, "json"))
+    return "\n".join(out)
+
+
+def info_location(info, fallback=""):
+    loc = info.get("location")
+    if isinstance(loc, dict):
+        return loc.get("directory") or loc.get("path") or fallback
+    if isinstance(loc, str) and loc:
+        return loc
+    return fallback
+
+
+def render_session_md(info, messages, md_max):
+    model = info.get("model") or {}
+    tokens = info.get("tokens") or {}
+    cache = tokens.get("cache") or {}
+    lines = [
+        f"# {info.get('title') or 'Untitled session'}",
+        "",
+        f"- session: `{info.get('id')}`",
+        f"- project dir: `{info_location(info, '?')}`",
+        f"- started: {iso((info.get('time') or {}).get('created'))}"
+        f" · last activity: {iso((info.get('time') or {}).get('updated'))}",
+        f"- model: `{model.get('providerID', '?')}/{model.get('id', '?')}`"
+        f" · agent: `{info.get('agent', '?')}`",
+        "- tokens: "
+        f"in={tokens.get('input', 0)} out={tokens.get('output', 0)} "
+        f"reasoning={tokens.get('reasoning', 0)} "
+        f"cache r={cache.get('read', 0)}/w={cache.get('write', 0)}"
+        f" · cost: ${info.get('cost', 0):.4f}"
+        f" · outcome: `{info.get('outcome', '?')}`",
+        "- messages: " + str(len(messages)),
+        "",
+        "Rendered by `scripts/export-agent-log` from `opencode session export`."
+        " Tool outputs are capped for readability; the full fidelity data"
+        " (every input and byte of output) is in the paired `.jsonl` file.",
+        "",
+        "---",
+        "",
+    ]
+    n_user = sum(1 for m in messages if m.get("type") == "user")
+    n_assistant = sum(1 for m in messages if m.get("type") == "assistant")
+    lines.append(
+        f"_{n_user} user prompts, {n_assistant} assistant"
+        f" turns, {len(messages)} messages total (incl. events)._"
+    )
+    lines.append("")
+
+    for i, msg in enumerate(messages, 1):
+        lines.append(render_message_md(msg, i, info.get("id", ""), md_max))
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def render_jsonl(info, messages, session_id, project_dir, jsonl_max):
+    meta = {
+        "_type": "session-log-meta",
+        "format": SCHEMA,
+        "generator": GENERATOR,
+        "source": "opencode session export",
+        "session_id": session_id,
+        "project_dir": project_dir,
+        "messages": len(messages),
+        "session_info": info,
+    }
+    lines = [json.dumps(meta, ensure_ascii=False)]
+    for msg in messages:
+        line = json.dumps(msg, ensure_ascii=False)
+        if jsonl_max and len(line) > jsonl_max:
+            blob = {
+                "_type": "truncated-message",
+                "id": msg.get("id"),
+                "type": msg.get("type"),
+                "original_bytes": len(line.encode("utf-8")),
+                "note": (
+                    "set AGENTLOG_JSONL_MAX=0 for full fidelity; "
+                    "the .md sibling carries a readable rendition"
+                ),
+            }
+            line = json.dumps(blob, ensure_ascii=False)
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
+def render_index(entries):
+    rows = []
+    for e in sorted(entries, key=lambda x: (x["time_created"] or 0, x["id"])):
+        rows.append(
+            f"| [`{e['id']}`](sessions/{e['id']}.md) "
+            f"| {e.get('title') or '(no title)'} "
+            f"| {iso(e['time_created'])} "
+            f"| {e['messages']} "
+            f"| {e.get('directory', '')} |"
+        )
+    return "\n".join(
+        [
+            "# Agent session log (generated)",
+            "",
+            "Verbatim log of the agentic sessions run in this repository:",
+            "user prompts, model reasoning, and every tool call with its"
+            " input/output. Generated by `scripts/export-agent-log` from"
+            " `opencode session export`; refreshed automatically by the"
+            " pre-commit hook. See `AGENTS.md` for the rule.",
+            "",
+            "**Do not edit files in this directory by hand** -- regenerate"
+            " instead:",
+            "",
+            "    scripts/export-agent-log",
+            "",
+            "Per session you get a readable `.md` (tool outputs capped at"
+            " `AGENTLOG_MD_MAX`, default 3000 chars) and a `.jsonl` sibling"
+            " with full fidelity (cap the JSONL itself with"
+            " `AGENTLOG_JSONL_MAX`, default: no cap). Output is"
+            " incremental: unchanged transcripts produce identical files;"
+            " growth is append-mostly (stable exceptions: the JSONL meta"
+            " line with live session totals, the last assistant message of"
+            " an in-progress turn, and this index's stats).",
+            "",
+            "The log is verbatim -- never paste secrets in a session that"
+            " this tool will commit.",
+            "",
+            "| session | title | started | messages | directory |",
+            "|---|---|---|---|---|",
+            *rows,
+            "",
+        ]
+    )
+
+
+# ----------------------------------------------------------------------------
+# main
+# ----------------------------------------------------------------------------
+
+def main(argv):
+    quiet = "--quiet" in argv
+    project_dir = os.path.abspath(os.getcwd())
+    out_dir = os.path.join(project_dir, DEFAULT_OUT)
+    if "--output" in argv:
+        out_dir = os.path.abspath(argv[argv.index("--output") + 1])
+    elif "--project" in argv:
+        project_dir = os.path.abspath(argv[argv.index("--project") + 1])
+        out_dir = os.path.join(project_dir, DEFAULT_OUT)
+    elif os.path.isdir(os.path.join(project_dir, "agentlog")):
+        out_dir = os.path.join(project_dir, "agentlog")
+
+    md_max = int(os.environ.get("AGENTLOG_MD_MAX", DEFAULT_MD_MAX))
+    jsonl_max = int(os.environ.get("AGENTLOG_JSONL_MAX", DEFAULT_JSONL_MAX))
+
+    opencode_bin = find_opencode()
+    if not opencode_bin:
+        die("opencode not installed in this environment; nothing to export",
+            EXIT_NO_OPENCODE)
+
+    sessions = discover_via_db(project_dir)
+    if not sessions:
+        sessions = discover_via_cli(opencode_bin)
+    if not sessions:
+        log(f"no opencode sessions found for {project_dir}; nothing to export")
+        return EXIT_OK
+
+    # The DB and the CLI may disagree about which sessions exist right now
+    # (brand-new sessions appear server-side first). Export CLI-side ids
+    # too via the list, minus duplicates.
+    known = {s["id"] for s in sessions}
+    for s in discover_via_cli(opencode_bin):
+        if s["id"] not in known:
+            sessions.append(s)
+            known.add(s["id"])
+
+    sessions.sort(key=lambda s: (s.get("time_created") or 0, s["id"]))
+
+    sessions_dir = os.path.join(out_dir, "sessions")
+    os.makedirs(sessions_dir, exist_ok=True)
+
+    index_entries = []
+    for s in sessions:
+        sid = s["id"]
+        payload = export_session(opencode_bin, sid)
+        info = payload.get("info") or {}
+        messages = payload.get("messages") or []
+
+        md = render_session_md(info, messages, md_max)
+        jsonl = render_jsonl(info, messages, sid, project_dir, jsonl_max)
+
+        with open(os.path.join(sessions_dir, f"{sid}.md"), "w") as fh:
+            fh.write(md)
+        with open(os.path.join(sessions_dir, f"{sid}.jsonl"), "w") as fh:
+            fh.write(jsonl)
+
+        index_entries.append(
+            {
+                "id": sid,
+                "title": info.get("title") or s.get("title"),
+                "time_created": info.get("time", {}).get("created")
+                or s.get("time_created"),
+                "messages": len(messages),
+                "directory": info_location(info)
+                or s.get("directory", ""),
+            }
+        )
+        log(
+            f"exported {sid}: {len(messages)} messages "
+            f"({info.get('title') or s.get('title')})",
+            quiet,
+        )
+
+    with open(os.path.join(out_dir, "README.md"), "w") as fh:
+        fh.write(render_index(index_entries))
+
+    # remove artifacts for sessions that no longer exist server-side
+    valid_files = {
+        f"{e['id']}.md" for e in index_entries
+    } | {f"{e['id']}.jsonl" for e in index_entries}
+    stale = [
+        f for f in os.listdir(sessions_dir)
+        if f.endswith((".md", ".jsonl")) and f not in valid_files
+    ]
+    for f in stale:
+        os.remove(os.path.join(sessions_dir, f))
+        log(f"removed stale artifact {f}", quiet)
+
+    if not quiet:
+        total = sum(
+            os.path.getsize(os.path.join(sessions_dir, f))
+            for f in os.listdir(sessions_dir)
+        )
+        log(f"agent log up to date: {len(index_entries)} session(s), {total} bytes")
+    return EXIT_OK
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except RuntimeError as exc:
+        die(str(exc))
+    except subprocess.SubprocessError as exc:
+        die(f"opencode is not reachable ({exc}); is the background service"
+            f" running? -- `opencode service status`")
+    except json.JSONDecodeError as exc:
+        die(f"could not parse export payload: {exc}")

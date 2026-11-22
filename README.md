@@ -200,6 +200,14 @@ Neovim/after for Vim — your file always wins):
   constant) and in the README, push, and the `curl -fsSL .../setup.sh | sh`
   one-liner above becomes live.
 
+## Agent session log
+
+Every commit in this repository carries the full agentic development log
+(user prompts, model reasoning, tool calls with input/output) under
+`agentlog/`. It is maintained by `scripts/export-agent-log` and a
+pre-commit hook (`.githooks/`, `core.hooksPath`); the rule lives in
+`AGENTS.md` and the browsable index in `agentlog/README.md`.
+
 ## License
 
 MIT (the lessons and tooling of this repository; the plugin libraries it
