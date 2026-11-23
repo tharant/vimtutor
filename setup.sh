@@ -269,16 +269,16 @@ else
   say "package installs skipped (managers/flags), continuing with what exists"
 fi
 
-# node quality check for coc.nvim: it needs >= 18 and refuses politely.
+# node quality check for coc.nvim: it needs >= 22 and refuses politely.
 if have node; then
   node_major="$(node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || echo 0)"
-  if [ "${node_major:-0}" -lt 18 ]; then
-    warn "node $(node -v 2>/dev/null) found but coc.nvim needs >= 18;"
+  if [ "${node_major:-0}" -lt 22 ]; then
+    warn "node $(node -v 2>/dev/null) found but coc.nvim needs >= 22;"
     say "completion will stay off until you update node, then re-run :PlugStatus"
   fi
 else
   warn "node missing: coc.nvim (completion/LSP) cannot run without it."
-  say "install node >= 18 (e.g. from nodejs.org or your distro), then re-run setup."
+  say "install node >= 22 (e.g. from nodejs.org or your distro), then re-run setup."
 fi
 
 # Editors present? (after installs)

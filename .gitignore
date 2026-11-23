@@ -11,5 +11,8 @@ scratch/
 # Downloaded by setup.sh in dev/link installs (vendored plug.vim)
 autoload/plug.vim
 
+# Written at runtime by the theme switcher (dev/link installs)
+.theme
+
 # Local redaction map for the agent log (PERSONAL -- never commit)
 .agentlog-redactions
