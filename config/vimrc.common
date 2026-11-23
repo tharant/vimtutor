@@ -11,7 +11,7 @@
 "  Layout of this file:
 "    1. plugin-less defaults (options that matter)
 "    2. your keys: leader + mappings
-"    3. colorscheme handling (:Theme)
+"    3. theme handling (:DotTheme)
 "    4. plugins via vim-plug, guarded per editor
 "    5. per-plugin configuration (coc.nvim, status line, treesitter, fzf)
 " ============================================================================
@@ -79,17 +79,44 @@ endif
 " Input and feedback.
 set mouse=a
 set timeout timeoutlen=500 ttimeoutlen=10
-set updatetime=300
+set updatetime=250    " snappy CursorHold (reference highlighting, §5)
 if has('nvim')
   set inccommand=split
 endif
 
-" True color where the terminal promises it (schemes like tokyonight
-" are unusable otherwise).
+" System clipboard: use it when a tool to talk to it exists. Without this
+" a console vim on a headless box errors on `set clipboard=...`.
+function! s:ClipboardShell() abort
+  for [cmd, args] in [
+        \ ['pbcopy',        ''],
+        \ ['wl-copy',       ''],
+        \ ['xclip',         ' -selection clipboard'],
+        \ ['win32yank.exe', ' -i --crlf'],
+        \ ['clip.exe',      ''],
+        \ ]
+    if executable(cmd)
+      return 'call system(''' . cmd . args . ''', @0)'
+    endif
+  endfor
+  return ''
+endfunction
+
+if has('clipboard') && exists('+clipboard') && !empty(s:ClipboardShell())
+  set clipboard=unnamedplus
+endif
+
+" True color where the terminal promises it (dark themes look their best
+" with true color); 256 colors everywhere else.
 let s:tgc = (exists('$COLORTERM') && $COLORTERM =~# 'truecolor\|24bit')
       \ || (exists('$KITTY_WINDOW_ID') || exists('$WEZTERM_PANE'))
-if has('termguicolors') && s:tgc
+if has('nvim')
   set termguicolors
+elseif exists('+termguicolors')
+  if s:tgc
+    set termguicolors
+  else
+    set t_Co=256
+  endif
 endif
 
 " A decent bare status line; airline/lualine replace it when installed.
@@ -99,7 +126,10 @@ set statusline=%<\ %f\ %y\ %m%r%=%-10.(%l,%c%V%)\ %P
 " --- 2. your keys ------------------------------------------------------------
 
 let g:mapleader = ' '
-let g:maplocalleader = ','
+let g:maplocalleader = ' '
+" Leader note: dots-vim ships the default backslash leader; dots-nvim uses
+" Space. The tutor serves BOTH editors from one file, so it standardizes on
+" Space like dots-nvim -- one key set to teach and use in either editor.
 
 " Files and windows
 nnoremap <silent> <leader>w    :write<CR>
@@ -118,48 +148,87 @@ nnoremap <silent> <leader>e    :Explore<CR>
 " Search niceties
 nnoremap <silent> <leader>h    :nohlsearch<CR>
 
-" --- 3. colorschemes ----------------------------------------------------------
+" <Leader>y sends the last-yanked text to the system clipboard. Only bound
+" when a clipboard helper exists (s:ClipboardShell() above).
+if !empty(s:ClipboardShell())
+  execute 'nnoremap <silent> <leader>y :' . s:ClipboardShell() . '<CR>'
+endif
 
-" Default theme per editor; override in the line above this comment block
-" or with :Theme<name>!  (the bang writes the choice back to this file).
-let g:vimtutor_theme = get(g:, 'vimtutor_theme', has('nvim') ? 'tokyonight' : 'gruvbox')
+" --- 3. theme system (:DotTheme) -----------------------------------------
+"  Dots parity: `:DotTheme gruvbox` / `:DotTheme codedark` (Tab-completes),
+"  same two themes, same messages, same quiet startup apply, default
+"  codedark when unset. One difference: the choice is persisted to the
+"  TUTOR's data dir (g:vimtutor_data/.theme = ~/.local/share/vimtutor/.theme),
+"  never ~/.vim/.theme, so it cannot fight a real dots install sharing this
+"  editor. Skipped entirely when :DotTheme already exists (a real dots
+"  vimrc was sourced first -- it keeps ownership of the name and of startup).
+if !exists(':DotTheme')
 
-function! s:VimtutorTheme(name, persist) abort
-  try
-    execute 'colorscheme' fnameescape(a:name)
-    let g:vimtutor_applied_theme = a:name
-  catch /^Vim\%((\a\+)\)\=:E/
+let s:theme_file = g:vimtutor_data . '/.theme'
+" tokyonight is one palette with two implementations: folke/tokyonight.nvim
+" (Neovim) and ghifarit53/tokyonight-vim (Vim, truecolor-only). Either way
+" it loads as colorscheme `tokyonight` and its airline theme follows.
+let s:themes = {
+      \ 'gruvbox':    {'colorscheme': 'gruvbox',    'airline': 'gruvbox'},
+      \ 'codedark':   {'colorscheme': 'codedark',   'airline': 'codedark'},
+      \ 'tokyonight': {'colorscheme': 'tokyonight', 'airline': 'tokyonight'},
+      \ }
+
+function! s:LoadTheme() abort
+  let name = filereadable(s:theme_file) ? trim(readfile(s:theme_file)[0]) : 'codedark'
+  return has_key(s:themes, name) ? name : 'codedark'
+endfunction
+
+" Second (optional) argument: quiet -- apply without a message. Startup uses
+" it so opening the editor doesn't echo anything; :DotTheme confirms.
+function! s:SetTheme(name, ...) abort
+  if !has_key(s:themes, a:name)
     echohl WarningMsg
-    echom "vimtutor: colorscheme '" . a:name . "' unavailable"
-          \ . " -- is it installed? (:PlugStatus)"
+    echomsg 'Unknown theme: ' . a:name
+          \ . ' (available: ' . join(sort(keys(s:themes)), ', ') . ')'
     echohl None
     return
+  endif
+  let t = s:themes[a:name]
+  if !empty(t.airline)
+    let g:airline_theme = t.airline   " vim only; inert without airline
+  endif
+  let g:gruvbox_italic = 1
+  try
+    execute 'colorscheme' t.colorscheme
+  catch /^Vim\%((\a\+)\)\=:E/
+    if !(a:0 && a:1)                  " quiet startup stays silent
+      echohl WarningMsg
+      echom 'vimtutor: colorscheme ''' . t.colorscheme
+            \ . ''' unavailable -- run :PlugInstall'
+      echohl None
+    endif
+    return                            " nothing persisted on failure
   endtry
-  if a:persist
-    let l:path = s:tutor_home . '/config/vimrc.common'
-    let l:done = 0
-    if filereadable(l:path) && filewritable(l:path)
-      let l:lines = readfile(l:path)
-      for l:idx in range(len(l:lines))
-        if l:lines[l:idx] =~# 'let\s*g:vimtutor_theme'
-          let l:lines[l:idx] = "let g:vimtutor_theme = '" . a:name . "'"
-          let l:done = 1
-          break
-        endif
-      endfor
-      if !l:done
-        call add(l:lines, '')
-        call add(l:lines, "let g:vimtutor_theme = '" . a:name . "'")
-      endif
-      call writefile(l:lines, l:path)
-    else
-      echom 'vimtutor: cannot persist theme to ' . l:path
+  try
+    call writefile([a:name], s:theme_file)
+  catch
+    if !(a:0 && a:1)
+      echom 'vimtutor: cannot persist theme to ' . s:theme_file
             \ . '; applied for this session only'
     endif
+  endtry
+  if !(a:0 && a:1)
+    echom 'Theme set to ' . a:name . ' (persisted to ' . s:theme_file . ')'
   endif
 endfunction
 
-command! -nargs=1 -bar -bang Theme call s:VimtutorTheme(<q-args>, !empty('<bang>'))
+command! -nargs=1 -complete=customlist,s:ThemeComplete DotTheme call s:SetTheme(<q-args>)
+function! s:ThemeComplete(arglead, cmdline, cursorpos) abort
+  return filter(sort(keys(s:themes)), 'v:val =~# "^" . a:arglead')
+endfunction
+
+" Quick switching. (dots-vim binds \tg/\tc -- leader is Space here, see §2.)
+nnoremap <silent> <leader>tg :DotTheme gruvbox<CR>
+nnoremap <silent> <leader>tc :DotTheme codedark<CR>
+nnoremap <silent> <leader>tt :DotTheme tokyonight<CR>
+
+endif " !exists(':DotTheme')
 
 " --- 4. plugins via vim-plug (managed in-editor) ------------------------------
 
@@ -175,7 +244,7 @@ else
   try
     call plug#begin(g:vimtutor_plugdir)
 
-    " Completion + LSP client: one engine for both editors. Needs Node 18+.
+    " Completion + LSP client: one engine for both editors. Needs node >= 22.
     Plug 'neoclide/coc.nvim', {'branch': 'release'}
 
     " Editor-grade syntax highlighting:
@@ -190,14 +259,22 @@ else
       Plug 'nvim-lualine/lualine.nvim'
     else
       Plug 'vim-airline/vim-airline'
+      Plug 'vim-airline/vim-airline-themes'  " airline side of :DotTheme
       " No powerline glyphs: readable on every stock terminal font.
+      " (dots-vim sets this flag to 1 -- an intentional diversion.)
       let g:airline_powerline_fonts = 0
     endif
 
-    " Colorschemes (tokyonight is Neovim-only; gruvbox is universal).
+    " Colorschemes -- one theme system for BOTH editors (:DotTheme).
+    " tokyonight has two implementations of the same palette: folke's
+    " Lua original on Neovim, ghifarit53's native Vim port (which also
+    " ships the airline palette). Both load under the name `tokyonight`.
     Plug 'morhetz/gruvbox'
+    Plug 'tomasiser/vim-code-dark'
     if has('nvim')
       Plug 'folke/tokyonight.nvim'
+    else
+      Plug 'ghifarit53/tokyonight-vim'  " truecolor-only Vim port
     endif
 
     " Editor quality-of-life (small, no config needed):
@@ -224,8 +301,13 @@ else
         \ |   echom 'vimtutor: plugins not installed yet -- run :PlugInstall'
         \ | endif
 
-  " Apply the default theme now that colorschemes are on the rtp.
-  autocmd VimEnter * ++once call s:VimtutorTheme(g:vimtutor_theme, 0)
+  " Startup: quietly re-apply the persisted theme. Silent skip when the
+  " colorscheme isn't installed yet (plugin-less first run). The
+  " !exists(':DotTheme') guard matches the theme block above: on the
+  " owner's box the real dots theme system keeps startup ownership.
+  if !exists(':DotTheme')
+    call s:SetTheme(s:LoadTheme(), 1)
+  endif
 endif
 
 " --- 5. per-plugin configuration ----------------------------------------------
@@ -233,10 +315,12 @@ endif
 " coc.nvim: completion, LSP, diagnostics (Lesson 12). Keymaps appear only
 " when the plugin is actually installed, so Tab keeps working meanwhile.
 if isdirectory(g:vimtutor_plugdir . '/coc.nvim')
-  " Suggested extensions auto-installed at startup (needs node).
+  " Suggested extensions auto-installed at startup. coc needs node >= 22
+  " at runtime (older node aborts the plugin; no node at all simply skips
+  " this). Same list as the dots vimrc.
   if executable('node')
     let g:coc_global_extensions =
-          \ get(g:, 'coc_global_extensions', ['coc-json', 'coc-tsserver'])
+          \ get(g:, 'coc_global_extensions', ['coc-json', 'coc-tsserver', 'coc-pyright'])
   endif
 
   " Navigation (Lesson 12)
@@ -246,15 +330,17 @@ if isdirectory(g:vimtutor_plugdir . '/coc.nvim')
   nmap <silent> gr <Plug>(coc-references)
   nmap <silent> [g <Plug>(coc-diagnostic-prev)
   nmap <silent> ]g <Plug>(coc-diagnostic-next)
+  " The nvim-LSP spelling the lessons print (same jumps):
+  nmap <silent> [d <Plug>(coc-diagnostic-prev)
+  nmap <silent> ]d <Plug>(coc-diagnostic-next)
 
-  nnoremap <silent> K :call <SID>ShowDocumentation()<CR>
-  function! s:ShowDocumentation() abort
-    try
+  nnoremap <silent> K :call ShowDocumentation()<CR>
+  function! ShowDocumentation()
+    if CocAction('hasProvider', 'hover')
       call CocActionAsync('doHover')
-    catch
-      " No hover provider for this buffer (or coc absent right now).
-      execute 'help' expand('<cword>')
-    endtry
+    else
+      call feedkeys('K', 'in')        " built-in keyword lookup fallback
+    endif
   endfunction
 
   " Refactor
@@ -263,13 +349,29 @@ if isdirectory(g:vimtutor_plugdir . '/coc.nvim')
   nmap <silent> <leader>qf <Plug>(coc-fix-current)
   xmap <silent> <leader>f  <Plug>(coc-format-selected)
 
-  " Completion popup keys (coc#pum): Tab accepts, Shift-Tab steps back,
-  " Ctrl-Space asks for completions.
+  " Highlight the symbol and its references while holding the cursor
+  " (updatetime is 250, so this lands quickly -- see section 1).
+  autocmd CursorHold * silent call CocActionAsync('highlight')
+
+  " Completion popup keys -- dots semantics: Tab steps to the next item,
+  " or inserts a real Tab when the cursor sits before whitespace, or asks
+  " coc for completions otherwise. Shift-Tab steps back. Enter accepts the
+  " selected item, or inserts a plain newline with coc's enter-format.
   inoremap <silent><expr> <TAB>
-        \ coc#pum#visible() ? coc#pum#confirm() : "\<Tab>"
-  inoremap <silent><expr> <S-TAB>
-        \ coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+        \ coc#pum#visible() ? coc#pum#next(1) :
+        \ CheckBackspace() ? "\<Tab>" :
+        \ coc#refresh()
+  inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+  inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
+        \                       : "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+  " Tutor-only additive extra (dots has none): Ctrl-Space still forces the
+  " trigger, so Lesson 12's "if nothing pops" hint stays true.
   inoremap <silent><expr> <c-space> coc#refresh()
+
+  function! CheckBackspace() abort
+    let col = col('.') - 1
+    return !col || getline('.')[col - 1] =~ '\s'
+  endfunction
 endif
 
 " treesitter (Neovim): highlight a practical language set.
@@ -298,6 +400,8 @@ if has('nvim') && isdirectory(g:vimtutor_plugdir . '/lualine.nvim')
         icons_enabled = false,          -- no Nerd Font required
         section_separators = '',
         component_separators = '|',
+        theme = 'auto',                 -- follows :DotTheme (builtin
+                                        -- gruvbox/codedark palettes)
       },
     })
   end
@@ -316,5 +420,6 @@ endif
 "  - :options            browse all settings interactively
 "  - :source $MYVIMRC    reload after editing
 "  - :PlugInstall        install every :Plug line above
+"  - :DotTheme gruvbox   switch and remember the colorscheme (Lesson 9)
 "  - :CocInstall coc-pyright   add a language server for your language
 " ============================================================================

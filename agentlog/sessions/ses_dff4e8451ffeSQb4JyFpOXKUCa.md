@@ -2,16 +2,16 @@
 
 - session: `ses_dff4e8451ffeSQb4JyFpOXKUCa`
 - project dir: ` ~/development/personal/vimtutor`
-- started: 2026-11-22 00:39:21Z · last activity: 2026-11-22 01:30:00Z
+- started: 2026-11-22 00:39:21Z · last activity: 2026-11-22 01:30:24Z
 - model: `ollama-cloud/glm-5.3-flash` · agent: `build`
 - outcome: `succeeded`
-- messages: 196
+- messages: 202
 
 Rendered by `scripts/export-agent-log` from `opencode session export`. Tool outputs are capped for readability; the full fidelity data (every input and byte of output) is in the paired `.jsonl` file.
 
 ---
 
-_3 user prompts, 187 assistant turns, 196 messages total (incl. events)._
+_3 user prompts, 192 assistant turns, 202 messages total (incl. events)._
 
 ## 1. USER — 2026-11-22 00:39:21Z
 
@@ -13588,3 +13588,300 @@ _extras: truncated=False_
 ```
 Created file successfully: LICENSE
 ```
+
+## 197. ASSISTANT — 2026-11-22 01:29:59Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls`_
+
+### Model reasoning
+
+Also fix the setup.sh header comment (my sed only fixed one line; check the header usage comment region):
+```
+#   --repo=URL_or_PATH       git URL (or local dir) of the tutor repo
+#                            (default: $VIMTUTOR_REPO_URL, else the built-in
+#                            URL below -- replace after forking!)
+```
+The sed replaced `URL below -- replace after forking!)` with `URL below).` — verify it took effect and shellcheck still passes. Then commit C2 (hook runs; no agentlog delta expected... note: pushing/remote operations later aren't session-recorded as repo content, fine).
+
+#### Tool `shell` — `completed`
+_call id: `call_z160c10g`_
+_extras: exit=0, truncated=False_
+**Input**
+```json
+{
+ "command": "cd  ~/development/personal/vimtutor && sed -n '10,20p' setup.sh && shellcheck setup.sh && echo \"shellcheck clean\" && git add setup.sh README.md LICENSE && git commit -q -m \"chore: wire publish targets ( <personal-hostname>/vimtutor) and add MIT license\" 2>&1 | head -3; echo \"C2 exit=$?\"; git log --oneline -3"
+}
+```
+**Output**
+```
+#   * never edits your init files without first making a timestamped backup
+#   * all of its own edits are marker-guarded and idempotent (re-run freely);
+#     --uninstall removes exactly those guarded blocks and nothing else
+#   * system package installs are skipped (with the commands printed) rather
+#     than guessed at when there is no passwordless sudo
+#   * nothing is run inside your editor unless you pass --auto-install-plugins
+#
+# Usage: sh setup.sh [options]
+#   --editor=both|vim|nvim   which editor to install/wire   (default: both)
+#   --repo=URL_or_PATH       git URL (or local dir) of the tutor repo
+#                            (default: $VIMTUTOR_REPO_URL, else the built-in
+shellcheck clean
+[pre-commit] agent session log refreshed and staged:
+    
+C2 exit=0
+853c84c chore: wire publish targets ( <personal-hostname>/vimtutor) and add MIT license
+da72e04 feat: scrub personal/system strings from the agent log at write time
+0878093 chore: agent session log refresh (documents the log-invariants guidance)
+
+```
+
+## 198. ASSISTANT — 2026-11-22 01:30:02Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls`_
+
+### Model reasoning
+
+C2 committed (`853c84c`). Now the **history rewrite**: scrub the agentlog blobs in commits `af9432da` and `0878093` (and C1/C2 if they carry agentlog — they do, already scrubbed; re-running the scrub is idempotent). Range: `39b84f5a..HEAD` (4 commits).
+
+filter-branch tree-filter:
+```
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --prune-empty --tree-filter 'if [ -d agentlog ]; then find agentlog -type f -exec "$ROOT/scripts/export-agent-log" --apply-redactions "$MAP" {} + ; fi' 39b84f5a..HEAD
+```
+with ROOT=$(pwd), MAP=$ROOT/.agentlog-redactions.
+
+Note: `--prune-empty` — the refresh commit 0878093's ONLY content is agentlog; if post-scrub the agentlog is unchanged vs its parent... af9432da's agentlog will be REDACTED (not equal to parent's — parent had no agentlog) → not empty. The chore commit 0878093 changed the log (append) — post-scrub still differs → not pruned. C1: adds files → fine. OK prune-empty harmless.
+
+After rewrite: 
+1. verify per-commit grep = 0 across ALL commits (incl. rewritten agentlog).
+2. cleanup refs/original + reflog expire + gc (drop old personal blobs from .git).
+3. Verify tests still pass + exporter works (unchanged).
+4. main branch: `git branch -f main` at tip; switch to main; delete feat branch.
+5. remote add origin git@github.com: <personal-hostname>/vimtutor.git.
+6. Final summary.
+
+Careful: running the tree filter calls `--apply-redactions "$MAP" {} +` — find on macOS? Linux find supports -exec {} +. Fine.
+
+Wait — one concern: filter-branch invokes tree-filter with the checkout in .git-rewrite/t/... My filter references $ROOT (absolute current repo path) scripts — independent of checkout. Good. Also the map path:  ~/development/personal/vimtutor/.agentlog-redactions.
+
+Also `git filter-branch` on a repo with hooks: irrelevant (no commit hooks fire during filter-branch).
+
+Let me also double check the scrub is idempotent ON ALREADY-REDACTED content (C1/C2 trees): patterns like ` ~` absent → no-op; `\$[0-9]+\.[0-9]{2,}` on `<cost>` placeholders → no digits → stable; `(?i)tokens (?:in|input)=\d+` → "tokens <hidden>" has no tokens=pattern → stable. ` <host> :: <host>` — hmm ` <host>` appears in map as ` <private-project>`... scrub of C1 tree content: fine.
+
+Run it.
+
+### Reply
+
+C2 done (`853c84c`). Now the history rewrite — scrubbing the agentlog blobs in the two affected commits (`af9432da`, `0878093`), idempotent over the two already-clean ones:
+
+#### Tool `shell` — `completed`
+_call id: `call_5k4ylcap`_
+_extras: exit=0, truncated=False_
+**Input**
+```json
+{
+ "command": "cd  ~/development/personal/vimtutor && ROOT=$(pwd) && MAP=\"$ROOT/.agentlog-redactions\" && FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --prune-empty --tree-filter \"if [ -d agentlog ]; then find agentlog -type f -exec '$ROOT/scripts/export-agent-log' --apply-redactions '$MAP' {} + ; fi\" 39b84f5a..HEAD 2>&1 | tail -5; echo \"filter exit=$?\"; echo ===; for c in $(git rev-list HEAD); do n=$(git grep -cE ' <user>| <personal-hostname>\\.net| <author>|\\b <host>\\b| <private-project>| <private-project>| <private-project>| ~' $c 2>/dev/null | wc -l); printf \"%s  personal-pattern-files=%s\\n\" \"${c:0:8}\" \"$n\"; done"
+}
+```
+**Output**
+```
+Rewrite 087809310e69ca7744ffa0b8b2c0d88ae666a173 (2/4) (0 seconds passed, remaining 0 predicted)    [agentlog] scrubbed 3/3 file(s)
+Rewrite da72e0471627483764605f7bf434f30ff4f5bec4 (3/4) (0 seconds passed, remaining 0 predicted)    [agentlog] scrubbed 0/3 file(s)
+Rewrite 853c84c67f00ec290c4ef33bf1cafe2507e74d91 (4/4) (0 seconds passed, remaining 0 predicted)    [agentlog] scrubbed 0/3 file(s)
+
+Ref 'refs/heads/feat/advanced-vimtutor' was rewritten
+filter exit=0
+===
+5cafd2d3  personal-pattern-files=1
+67d4227e  personal-pattern-files=0
+a3d61ada  personal-pattern-files=0
+8ed5c792  personal-pattern-files=0
+39b84f5a  personal-pattern-files=0
+03933900  personal-pattern-files=0
+82aeea1b  personal-pattern-files=0
+8ab05c7a  personal-pattern-files=0
+05efe794  personal-pattern-files=0
+3576a2ed  personal-pattern-files=0
+
+```
+
+## 199. ASSISTANT — 2026-11-22 01:30:07Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls`_
+
+### Model reasoning
+
+The rewrite ran (commits renamed: af9432da→?, 0878093→a3d61ada maybe, da72e04→67d4227e, 853c84c→8ed5c792, and the tip → 5cafd2d3?? Wait — only 4 commits were in range; the log shows 10 commits total with tip 5cafd2d3... hmm — filter-branch rewrote the range and HEAD; tips: 5cafd2d3 personal-pattern-files=1 — the NEW TIP still has 1 file with personal patterns?! 
+
+Wait, what happened: the branch got rewritten, but there are now 10 commits?? Earlier there were 8. Let me count: rev-list now lists 10. Something's off — filter-branch shouldn't ADD commits. Unless... the hook fired after? No. Let me look: `git rev-list HEAD` — 10 entries: 5cafd2d3, 67d4227e, a3d61ada, 8ed5c792, 39b84f5a (unchanged range start), 03933900, 82aeea1b, 8ab05c7a, 05efe794, 3576a2ed. That's: old tail (6) + 4 rewritten = 10. Before rewrite: 8 commits (6 tail + 2 log-bearing). Now 10 — 4 in range (af9432da→?, 0878093→a3d61ada?, da72e04→67d4227e, 853c84c→8ed5c792) + tip 5cafd2d3?? That's FIVE in range?! So the range `39b84f5a..HEAD` actually contained FIVE commits — meaning the branch tip at filter time had af9432da + 0878093 + da72e04 + 853c84c + ... 5 MORE? Let me think — the tip BEFORE filter: C2 commit 853c84c. Range 39b84f5a..HEAD = af9432da, 0878093, da72e04, 853c84c = 4 commits. But filter said "Rewrite ... (4/4)" — 4 commits! Then why does rev-list show 5 post-rewrite commits before 39b84f5a?
+
+OH — I see: after filter-branch rewrote the 4 commits, the WORKING TREE state at HEAD... no. Hmm, `git rev-list HEAD` after filter shows NEW shas. 5cafd2d3 (tip, personal=1!) + 67d4227e + a3d61ada + 8ed5c792 = 4 new shas + 39b84f5a = 5 entries before older commits. But filter rewrote exactly 4. So the tip 5cafd2d3 should BE one of the 4 (853c84c's rewrite). But then why 10 total = 5 new + 5 old? Before: 8 total. 8 + ... 10 means +2?? 
+
+Hold on — 3576a2ed, 05efe794, 8ab05c7a, 82aeea1b, 03933900 = 5 old tail + 39b84f5a? That's SIX entries before af9432da in the original. Original order: 3576a2ed, 05efe794, 8ab05c7a, 82aeea1b, 03933900, 39b84f5a, af9432da, 0878093, da72e04, 853c84c = 10 commits! I miscounted earlier as 8 (the history scan earlier showed 8 because at that time da72e04/853c84c didn't exist and rev-list showed 8: 0878093, af9432da, 39b84f5a, 03933900, 82aeea1b, 8ab05c7a, 05efe794, 3576a2ed = 8). NOW 10 (with C1/C2). Right — 10 total, 4 rewritten, 6 unchanged. Consistent!
+
+The remaining FLAG: tip 5cafd2d3 = rewritten 853c84c (C2) — and `personal-pattern-files=1`?! The filter scrubbed C2's agentlog ("scrubbed 0/3" — idempotent no-op) — files already clean... so which file in 5cafd2d3 matches? The pattern list includes `\b <host>\b` — what file? Possibly `.agentlog-redactions.example`? No — no personal... could be `README.md`?? I wrote "Copyright (c) 2026  <author>" in LICENSE!!! The pattern ' <author>' matches the LICENSE file — added in C2!
+
+Ha — right: LICENSE contains the real name AND... also `git@github.com: <personal-hostname>/vimtutor.git` remote isn't tracked (git config, not in tree). The LICENSE name is the user's PUBLIC identity — publishing as their own name is normal. But should I flag/ask? They chose their public identity; the audit's 'real name' pattern now hits LICENSE by design. The decision: keep (it's attribution — the user's copyright) — but surface it clearly in the summary as a deliberate, user-visible choice ("LICENSE carries your name/copyright — edit if you prefer a handle").
+
+Which file is it? Verify: git grep in 5cafd2d3 for the pattern to confirm it's LICENSE (and confirm no agentlog residue). Also the .agentlog-redactions local file is untracked — not scanned by git grep.
+
+Then: check filter-scrub actually redacted the OLD blobs (a3d61ada = rewritten 0878093: 0 files match — clean! af9432da→? listed? The rewritten log-bearing commits a3d61ada (2/4) shows scrubbed 3/3 → clean. 
+
+Also confirm the OLD pre-rewrite tip commit hashes gone (they are — rewrite replaced the branch; backups at refs/original/). Cleanup: refs/original, reflog expire, gc prune to wipe old blobs from disk. IMPORTANT: user's personal data then only exists in... nothing in .git (gc drops unreachable). Do it.
+
+Then verify working tree unchanged & tests pass & exporter works. Then prep publish: branch main + remote + final tree listing + summary. Also confirm hooks still installed (core.hooksPath).
+
+### Reply
+
+Rewrite done — but the new tip still shows `personal-pattern-files=1`. Almost certainly the LICENSE's copyright line (your public attribution, added in C2). Confirming, then dropping the pre-rewrite objects entirely:
+
+#### Tool `shell` — `completed`
+_call id: `call_l2qdo8g4`_
+_extras: exit=0, truncated=False_
+**Input**
+```json
+{
+ "command": "cd  ~/development/personal/vimtutor && git grep -nE ' <user>| <personal-hostname>\\.net| <author>|\\b <host>\\b| <private-project>| <private-project>| <private-project>| ~' 5cafd2d3 | sed 's/^\\(.\\{0,90\\}\\).*/\\1/'; echo ===; echo \"=== wipe pre-rewrite objects ===\"; git for-each-ref --format='%(refname)' refs/original | tee /tmp/filter-branch-backups.txt | xargs -r -n1 git update-ref -d && git reflog expire --expire=now --all && git gc --prune=now --quiet && echo \"refs/original: removed; gc done\"; git fsck --unreachable 2>/dev/null | head -3; git rev-list HEAD | wc -l"
+}
+```
+**Output**
+```
+5cafd2d3:LICENSE:3:Copyright (c) 2026  <author>
+===
+=== wipe pre-rewrite objects ===
+refs/original: removed; gc done
+10
+
+```
+
+## 200. ASSISTANT — 2026-11-22 01:30:16Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `tool-calls`_
+
+### Model reasoning
+
+Confirmed: the only remaining personal-pattern hit in the entire rewritten history is **LICENSE line 3 — "Copyright (c) 2026  <author>"** — deliberate attribution, standard for a public repo. I'll surface it as the one deliberate personal string (and they can swap to a handle if they prefer).
+
+`git fsck --unreachable` printed nothing → old objects are gone from .git.
+
+Now final steps:
+1. Run the full test suite once more (exporter changed — but tests don't exercise it... config_check + smoke touch nothing new; run anyway).
+2. Point `main` at the tip, switch to it, delete the feat branch (rules: delete after merge).
+3. Add remote `origin git@github.com: <personal-hostname>/vimtutor.git`.
+4. Verify hook still armed (core.hooksPath=.githooks) — filter-branch rewrote refs but not config.
+5. Re-verify determinism-ish idempotency once (exporter run → no diff) — careful: the exporter run lands new messages → dirty again; skip (next commit sweeps; tree is clean NOW — leave it clean).
+6. Final summary with the publish checklist.
+
+### Reply
+
+Only the deliberate LICENSE attribution remains in all of history; `.git` is purged of pre-rewrite objects. Final verification + publish prep (main, remote, hook check):
+
+#### Tool `shell` — `completed`
+_call id: `call_90tw6sfm`_
+_extras: exit=0, truncated=False_
+**Input**
+```json
+{
+ "command": "cd  ~/development/personal/vimtutor && sh test/run.sh all >/dev/null 2>&1 && echo \"test suite: PASS\" && git branch -f main HEAD && git switch main 2>&1 | tail -1 && git branch -d feat/advanced-vimtutor 2>&1 && git remote add origin git@github.com: <personal-hostname>/vimtutor.git && git remote -v | head -2 && echo \"hooks: $(git config core.hooksPath)\" && git log --oneline | head -10 && echo \"=== final tree ===\" && git ls-files | grep -v agentlog | head -30 && echo \"=== status ===\" && git status --porcelain | wc -l"
+}
+```
+**Output**
+```
+test suite: PASS
+Switched to branch 'main'
+Deleted branch feat/advanced-vimtutor (was 5cafd2d).
+origin	git@github.com: <personal-hostname>/vimtutor.git (fetch)
+origin	git@github.com: <personal-hostname>/vimtutor.git (push)
+hooks: .githooks
+5cafd2d chore: wire publish targets ( <personal-hostname>/vimtutor) and add MIT license
+67d4227 feat: scrub personal/system strings from the agent log at write time
+a3d61ad chore: agent session log refresh (documents the log-invariants guidance)
+8ed5c79 feat: agent session log infrastructure (exporter, pre-commit hook, rule)
+39b84f5 fix: vim-plug detection on neovim + lua wiring reports real pcall errors
+0393390 docs: README with install guide, flag table, lesson map, and editor notes
+82aeea1 feat: shared editor configuration and setup.sh installer
+8ab05c7 feat: tutor plugin runtime -- :Tutor command, sandbox, syntax, docs, tests
+05efe79 docs: add lessons 7-13 and language demo files
+3576a2e docs: add advanced tutor lessons 0-6 (index, windows, buffers, registers, macros, visual, search)
+=== final tree ===
+.githooks/pre-commit
+.gitignore
+AGENTS.md
+CLAUDE.md
+LICENSE
+README.md
+autoload/vimtutor.vim
+config/vimrc.common
+doc/vimtutor.txt
+ftdetect/vimtutor.vim
+ftplugin/vimtutor.vim
+lessons/00-index.vimtutor
+lessons/01-splits.vimtutor
+lessons/02-buffers-tabs.vimtutor
+lessons/03-registers.vimtutor
+lessons/04-macros.vimtutor
+lessons/05-visual-text-objects.vimtutor
+lessons/06-search-replace-quickfix.vimtutor
+lessons/07-marks-jumps.vimtutor
+lessons/08-folding.vimtutor
+lessons/09-config-plugins-themes.vimtutor
+lessons/10-files-sessions-netrw.vimtutor
+lessons/11-terminal-git.vimtutor
+lessons/12-completion-lsp-coc.vimtutor
+lessons/13-cheatsheet.vimtutor
+lessons/demo/lang-demo.c
+lessons/demo/lang-demo.js
+lessons/demo/lang-demo.py
+plugin/vimtutor.vim
+scripts/export-agent-log
+=== status ===
+0
+
+```
+
+## 201. ASSISTANT — 2026-11-22 01:30:19Z  <!-- model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `stop` -->
+_model `ollama-cloud/glm-5.3-flash`; agent `build`; finish `stop`_
+
+### Model reasoning
+
+Everything is in place. The caveats are now in git history (commit 0878093's refresh + AGENTS.md wording in the infra commit, and my explanatory messages are captured in the log snapshots). The repo is clean, on `main`, remote set, hooks armed, tests pass.
+
+Summary for the user — cover:
+1. The caveat commit + where the caveats live in history (AGENTS.md wording commit was folded; the refresh commit 0878093/a3d61ad + the log itself contain the discussion; exact caveat text lives in AGENTS.md since 8ed5c79).
+2. Audit results summary (what was found, what was cleaned).
+3. The redaction mechanism (map local, template shipped, usage stats hidden, --apply-redactions; history rewrite: only agentlog slices rewritten, commit ids changed — old ids: af9432da→8ed5c79, 0878093→a3d61ad, da72e04→67d4227e, 853c84c→5cafd2d; .git purged).
+4. One deliberate personal string left: LICENSE copyright (their name) — note they can change to a handle.
+5. Wired  <personal-hostname>/vimtutor everywhere (setup.sh constant, README one-liner/clone/notes, remote) + LICENSE added.
+6. Publish checklist: create GitHub repo (gh command or web), push -u origin main; after that, the hook keeps the redacted log flowing on every commit.
+7. Mention remaining: push needs their GitHub auth; repo creation.
+
+Keep it tight.
+
+### Reply
+
+All done. Summary of this round:
+
+## The commit you asked for
+
+`a3d61ad chore: agent session log refresh` — the caveats and their rationale are now permanently in history three ways: the AGENTS.md wording (commit `8ed5c79`), the refresh commit itself, and the logged discussion inside `agentlog/` (the redacted transcript includes the full invariant analysis).
+
+## The audit & what was cleaned
+
+- **Clean everywhere else.** 40 tracked files: lessons, plugin, config, setup.sh, tests, docs — zero personal/system strings, zero secrets (token/key/IP patterns all negative). The two gitignored files (vendored `plug.vim`, `doc/tags`) can't be published.
+- **Everything personal lived in `agentlog/`** — ~1130 ` ~` path hits, hostname ` <host>`, four other private project names, your name/email in captured git output, and per-message token/cost stats.
+- **Fix, now part of the mechanism** (commit `67d4227`): the exporter scrubs every rendered artifact through a **local, gitignored `.agentlog-redactions` map** (repo ships the format + `.agentlog-redactions.example`, never your map). Your map: home paths → `~`, name → `<author>`, email → `<email>`, hostname + other project names → redacted, machine paths mapped away, and **usage stats hidden by default** (`AGENTLOG_HIDE_USAGE`, nulled + flagged in the JSONL meta line). Verified: **all tracked files clean**.
+- **History rewritten**: only the log-bearing commits' `agentlog/` blobs were scrubbed (`filter-branch` + `--apply-redactions`), the pre-rewrite objects and backup refs are purged from `.git`. Old ids → new: `af9432da→8ed5c79`, `0878093→a3d61ad`, `da72e04→67d4227e`, `853c84c→5cafd2d`. A full-history scan now flags **exactly one** personal string: `LICENSE` line 3, `Copyright (c) 2026  <author>` — deliberate attribution; make it a handle if you'd rather.
+
+## Publish wiring
+
+- ` <personal-hostname>/vimtutor` is wired into `setup.sh`'s default URL, the README one-liner, and the clone URL; no placeholders remain. `LICENSE` (MIT) added; README's publish notes now describe the redaction-map step for forks.
+- `main` points at the tip (feature branch deleted per the git rules), `origin → git@github.com: <personal-hostname>/vimtutor.git`, hooks still armed (`core.hooksPath = .githooks`), test suite green, tree clean.
+
+## What's left for you (needs your GitHub credentials)
+
+```sh
+gh repo create  <personal-hostname>/vimtutor --public --source=. --push   # or:
+# create the repo on github.com, then:
+git push -u origin main
+```
+
+After that, every commit — from any tool or human — automatically ships a privacy-scrubbed, append-mostly agent log, and if any output ever reveals a new personal pattern, you add one line to `.agentlog-redactions` and regenerate.
+
+## 202. IDLE — 2026-11-22 01:30:24Z
+
+> session event: {"outcome": "succeeded"}

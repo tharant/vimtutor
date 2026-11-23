@@ -21,7 +21,11 @@ call s:check('undo directory created and undofile on',
       \ &undofile && isdirectory(expand(&undodir)))
 call s:check('undodir is inside the isolated data dir',
       \ stridx(expand(&undodir), 'vimtutordata') >= 0)
-call s:check(':Theme command defined', exists(':Theme') == 2)
+call s:check(':DotTheme command defined', exists(':DotTheme') == 2)
+call s:check('old :Theme command gone', exists(':Theme') != 2)
+call s:check('theme quick maps bound',
+      \ maparg('<Leader>tg', 'n') !=# '' && maparg('<Leader>tt', 'n') !=# '')
+call s:check('updatetime is 250', &updatetime ==# 250)
 call s:check('leader mapped (write)', maparg('<Leader>w', 'n') !=# '')
 call s:check('no plugin keys mapped while plug.vim absent',
       \ maparg('<C-Space>', 'i') ==# '')
