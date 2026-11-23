@@ -38,7 +38,7 @@ Runs on Linux (apt, dnf/yum, zypper, pacman, apk) and macOS (Homebrew):
    default both), plus `git`/`curl`. Skipped gracefully — with the exact
    commands printed for you to run — when there is no passwordless root
    (`sudo -n`). Opt in `fzf` + `ripgrep` with `--with-tools`.
-2. **Checks Node.js** (≥ 18) — `coc.nvim` needs it; you get a pointed warning
+2. **Checks Node.js** (≥ 22) — `coc.nvim` needs it; you get a pointed warning
    either way (no surprise third-party repositories are ever added).
 3. **Installs the tutor runtime** into `~/.local/share/vimtutor` (override
    with `--home=` or `$VIMTUTOR_HOME`) — the lessons, the plugin, the shared
@@ -144,7 +144,7 @@ get a clean, sane vanilla editor, and afterward the full experience.
 | completion + LSP | coc.nvim | coc.nvim *(same keys)* |
 | syntax highlighting | vim-polyglot | nvim-treesitter |
 | status line | vim-airline | lualine.nvim |
-| colorschemes | gruvbox | gruvbox + tokyonight |
+| colorschemes | gruvbox, codedark, tokyonight (`:DotTheme`) | same |
 | git | fugitive | fugitive |
 | fuzzy finder | fzf.vim (if `fzf` binary) | fzf.vim (if `fzf` binary) |
 | small QoL | commentary, surround, sleuth | same |
@@ -157,13 +157,18 @@ Neovim/after for Vim — your file always wins):
   split, `<space>t` tab-new, `<space>bl` `:ls`, `<space>h` clears search, …
 - `hidden`, `splitbelow splitright`, `number relativenumber`, `scrolloff=8`,
   `ignorecase smartcase`, `wildmenu`, `path+=**`, persistent undo.
-- coc keys (when coc is installed): `gd gy gi gr`, `[g ]g`, `K`,
+- coc keys (when coc is installed): `gd gy gi gr`, `[g ]g` and `[d ]d`, `K`,
   `<leader>rn` rename, `<leader>ac` code action, `<leader>qf` quickfix,
-  `<leader>f` format selection; Tab accepts completions, `Ctrl-Space` triggers.
-- `:Theme gruvbox` switches colorschemes (`:Theme name!` persists the choice
-  by rewriting the default inside the shared config).
-- The system clipboard is deliberately **not** merged with `"` — lesson 03
-  explains the tradeoff and how to flip it (`:set clipboard=unnamed`).
+  `<leader>f` format selection; Tab/S-Tab navigate the completion menu,
+  Enter confirms it, `Ctrl-Space` refreshes the trigger.
+- `:DotTheme gruvbox` / `:DotTheme codedark` switch colorschemes; the choice
+  persists in `~/.local/share/vimtutor/.theme` (tutor-owned, survives tutor
+  updates — the shared config file is never rewritten). Until you pick one,
+  **codedark** is the default.
+- The system clipboard is merged (`set clipboard=unnamedplus`) whenever a
+  clipboard helper is found (`pbcopy`/`wl-copy`/`xclip`/`win32yank.exe`/
+  `clip.exe`); lesson 03 explains the tradeoff and `:set clipboard=`
+  splits them back apart.
 
 ## Vim vs Neovim notes
 
@@ -183,7 +188,7 @@ Neovim/after for Vim — your file always wins):
 | Symptom | Fix |
 |---|---|
 | `:Tutor` says no lessons found | the install tree moved — re-run `setup.sh` (it only rewrites its managed block) |
-| no completion menus in lesson 12 | `:CocInfo` + node ≥ 18? then `:CocInstall coc-tsserver` |
+| no completion menus in lesson 12 | `:CocInfo` + node ≥ 22? then `:CocInstall coc-tsserver` |
 | vim `E319`/feature complaints from coc | your vim lacks `+channel` — switch to Neovim or a fuller vim build (`vim-gtk3`) |
 | colors look wrong over SSH | `export COLORTERM=truecolor` before launching, or pick gruvbox |
 | want the old tutor exactly | `:TutorClassic` here, or plain `vimtutor` in a shell |

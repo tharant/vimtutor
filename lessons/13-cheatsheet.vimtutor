@@ -38,7 +38,7 @@
   ~ :e $MYVIMRC :source $MYVIMRC  :options :echo stdpath('data')
   ~ nnoremap <leader>x ...        let mapleader = " "
   ~ :PlugStatus :PlugInstall :PlugUpdate :PlugClean
-  ~ :CocInstall coc-tsserver      :Theme gruvbox  :colorscheme <Tab>
+  ~ :CocInstall coc-tsserver      :DotTheme codedark  :colorscheme <Tab>
 
   FILES, :args, SESSIONS, netrw                          (Lesson 10)
   ~ :Ex :Sexplore :Vexplore :Texplore   v o t i - D R (in netrw)
@@ -51,7 +51,7 @@
   ~ :Gvdiffsplit ]c [c dp do      :vertical diffsplit file
 
   COMPLETION AND LSP (coc.nvim)                          (Lesson 12)
-  ~ Ctrl-Space Ctrl-N Ctrl-P Tab Ctrl-y Ctrl-e
+  ~ Ctrl-Space Tab S-Tab Enter Ctrl-N Ctrl-P
   ~ K  gd  gr  gy  gi  Ctrl-O     ]d [d :CocList diagnostics
   ~ <Leader>rn <Leader>ac <Leader>qf    :CocList outline :CocCommand
   ~ :CocConfig :CocInfo :CocRestart :CocInstall :CocList extensions

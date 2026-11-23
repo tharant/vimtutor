@@ -59,32 +59,44 @@
      ~   What the reasonable defaults give you:
      ~
      ~  ~ coc.nvim                    completion + LSP client (Lesson 12).
-     ~  ~                             Needs Node.js 18+. Vim AND Neovim.
+     ~  ~                             Needs Node.js 22+. Vim AND Neovim.
      ~  ~ vim-polyglot (Vim) /        rich, fast syntax highlighting for
      ~  ~ nvim-treesitter (Neovim)    200+ filetypes
      ~  ~ vim-airline (Vim) /         the status line you see above/below
-     ~  ~ lualine (Neovim)
-     ~  ~ gruvbox + tokyonight        colorschemes
+     ~  ~ lualine (Neovim)            -- it follows your theme
+     ~  ~ gruvbox + codedark +        colorschemes -- one :DotTheme
+     ~  ~ tokyonight                  system, both editors (Lesson 9)
      ~  ~ fugitive                    git inside vim (Lesson 11)
      ~  ~ surround, commentary, sleuth  tiny, daily quality-of-life
      ~  ~ fzf.vim                     fuzzy finder -- only installed when
      ~  ~                             the fzf + ripgrep binaries exist
      ~
-     ~   coc EXTENSIONS are a second, coc-managed family, also installed
-     ~   from inside the editor:   :CocInstall coc-json coc-tsserver
+     ~   coc EXTENSIONS are a second, coc-managed family; the tutor
+     ~   auto-installs coc-json, coc-tsserver and coc-pyright at first
+     ~   launch (needs node above). Add more from inside the editor:
+     ~   :CocInstall <name>           (try coc-clangd for C/C++)
 
   5. Colorschemes:
      ~
      ~   :colorscheme<Space><Tab>     cycle through what is available
      ~   :colorscheme gruvbox         the classic
-     ~   :colorscheme tokyonight      (Neovim only -- it is a Lua theme)
+     ~   :colorscheme codedark        VS Code Dark+ -- works in both
+     ~                                editors (a plain Vim scheme)
+     ~   :colorscheme tokyonight      one palette, two implementations:
+     ~                                folke's Lua original (Neovim) and
+     ~                                a native Vim port (truecolor)
      ~   :set background?             dark/light; good schemes respect it
      ~
      ~   The shared config defines a helper that switches AND remembers:
      ~
-     ~     :Theme tokyonight          applies immediately; to make it
-     ~                                permanent set g:vimtutor_theme
-     ~                                in the shared config file.
+     ~     :DotTheme gruvbox          applies now AND remembers (same
+     ~                                for codedark and tokyonight)
+     ~
+     ~   The choice is stored in ~/.local/share/vimtutor/.theme, so it
+     ~   survives restarts without touching the shared config file.
+     ~   Until you pick one, codedark is the default. The status line
+     ~   follows along (airline on Vim, lualine on Neovim). Quick keys:
+     ~   <Space>tg, <Space>tc, <Space>tt.
 
   6. Where everything actually lives, on disk:
      ~
@@ -102,6 +114,6 @@
   ~ let mapleader = " "       a personal prefix for your keys
   ~ :PlugStatus :PlugInstall  vim-plug manages plugins in-editor
   ~ :CocInstall coc-...       coc manages ITS extensions separately
-  ~ :Theme name               switch colorschemes (helper from config)
+  ~ :DotTheme name            switch colorschemes (helper from config)
 
 ================================================================================

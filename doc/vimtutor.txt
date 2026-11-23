@@ -90,8 +90,12 @@ editor-sensitive pieces live in the config the setup script installs
 
 - syntax highlighting is vim-polyglot on Vim, nvim-treesitter on Neovim
 - the status line is vim-airline on Vim, lualine on Neovim
-- tokyonight is a Neovim-only colorscheme; gruvbox works on both
-- coc.nvim (completion/LSP) and fzf.vim (if present) run on both
+- themes are gruvbox, codedark and tokyonight, switched with :DotTheme;
+  the choice is persisted in "{data-dir}/.theme". Tokyonight is the
+  folke/tokyonight.nvim Lua original on Neovim and the ghifarit53 port
+  on Vim (truecolor only); gruvbox/codedark work everywhere
+- coc.nvim (completion/LSP) needs node >= 22 and runs on both editors,
+  as does fzf.vim (if present)
 
 ===============================================================================
 vim:tw=78:ts=8:ft=help:norl:
