@@ -161,7 +161,10 @@ endfunction
 " (markdown format, :Tutor in stock form). Kept here so nothing is lost
 " by our command override.
 function! vimtutor#classic(arg) abort
-  if exists('*tutor#TutorCmd')
+  " exists('*tutor#TutorCmd') never triggers autoloading, so before the
+  " stock tutor's first use it is 0 even when autoload/tutor.vim ships;
+  " look for the file on 'runtimepath' instead (calling then autoloads).
+  if exists('*tutor#TutorCmd') || !empty(globpath(&runtimepath, 'autoload/tutor.vim', 0, 1))
     call tutor#TutorCmd(a:arg)
   else
     echohl WarningMsg

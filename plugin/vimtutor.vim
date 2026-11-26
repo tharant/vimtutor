@@ -10,15 +10,20 @@
 "
 " Both editors ship their own "tutor" runtime (markdown format, command
 " :Tutor) for ft=tutor files. Our lessons use a DISTINCT filetype
-" (vimtutor), and because this directory is appended to 'runtimepath',
-" the command! below is defined LAST and wins over the stock command in
-" both editors. The stock interactive tutor stays reachable as
-" :TutorClassic (see TutorClassic below and :help vimtutor).
+" (vimtutor). The stock plugin/tutor.vim does nothing but define :Tutor,
+" behind the g:loaded_tutor_mode_plugin guard, so we claim that guard:
+" when this directory comes first on 'runtimepath' (config/vimrc.common
+" and test/mini.vim prepend it) the stock plugin then skips itself, and
+" when it comes later our command! below simply redefines :Tutor. Either
+" order leaves :Tutor ours. The stock tutor (its autoload functions are
+" untouched) stays reachable as :TutorClassic (see below and
+" :help vimtutor).
 
 if exists('g:loaded_vimtutor') || &compatible
   finish
 endif
 let g:loaded_vimtutor = 1
+let g:loaded_tutor_mode_plugin = 1  " stock plugin/tutor.vim: skip, :Tutor is ours
 
 " Repository root: this file is <root>/plugin/vimtutor.vim
 let s:plugin_root = expand('<sfile>:p:h:h')
