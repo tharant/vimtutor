@@ -32,7 +32,8 @@ Then in your editor:
 
 ## What `setup.sh` does (and deliberately does not do)
 
-Runs on Linux (apt, dnf/yum, zypper, pacman, apk) and macOS (Homebrew):
+Runs on Linux (apt, dnf/yum, zypper, pacman, apk) and macOS (Homebrew or
+MacPorts — see [macOS](#macos) below):
 
 1. **Installs missing system packages** — `neovim` and/or `vim` (your choice,
    default both), plus `git`/`curl`. Skipped gracefully — with the exact
@@ -81,6 +82,30 @@ endif
 | `--no-pkg` | never touch system packages, print commands instead |
 | `--auto-install-plugins` | run `:PlugInstall --sync` headlessly right now |
 | `--uninstall` | remove both managed blocks (keeps backups + the clone; it prints one `rm -rf` for that) |
+
+### macOS
+
+`setup.sh` uses whichever package manager is installed: Homebrew
+(`/opt/homebrew` or `/usr/local`) or MacPorts (`/opt/local`). It looks in
+those prefixes even when a `curl | sh` shell's `PATH` lacks them. It never
+installs a package manager itself.
+
+| Installed | Used |
+|-----------|------|
+| one of them | that one |
+| both, Apple Silicon | Homebrew |
+| both, Intel | MacPorts (Homebrew no longer supports Intel Macs) |
+| neither | nothing; it prints how to install Homebrew (Apple Silicon) or MacPorts (Intel) |
+
+To choose yourself, set `VIMTUTOR_MACOS_PKG_MGR=brew` or `=port`. The dots
+repo's `DOTS_MACOS_PKG_MGR` is honored too. With MacPorts, installs run as
+`sudo -n port -N install …`, so they need passwordless sudo; without it the
+exact command is printed instead. MacPorts only ships versioned Node.js ports,
+so the hint for node is `sudo port install nodejs24`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tharant/vimtutor/main/setup.sh | VIMTUTOR_MACOS_PKG_MGR=port sh
+```
 
 ## Manual install (no `curl | sh`)
 

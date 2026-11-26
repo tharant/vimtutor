@@ -30,6 +30,11 @@
 #   --uninstall              remove the vimtutor blocks from your init files
 #   --dry-run                print what would happen, change nothing
 #   --help                   this text
+#
+# macOS: uses whichever of Homebrew / MacPorts is installed. With both, it
+# picks Homebrew on Apple Silicon and MacPorts on Intel (Homebrew no longer
+# supports Intel Macs); VIMTUTOR_MACOS_PKG_MGR=brew|port overrides (the
+# dots repo's DOTS_MACOS_PKG_MGR is honored too). It never installs either.
 # ============================================================================
 
 set -eu
@@ -64,7 +69,7 @@ run() {
 }
 
 usage() {
-  sed -n '3,35p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,38p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 }
 
@@ -100,15 +105,60 @@ case "$OS" in
 esac
 
 PKG=''
-for m in apt-get dnf yum zypper pacman apk brew; do
-  if command -v "$m" >/dev/null 2>&1; then
-    case "$m" in
-      apt-get) PKG=apt ;;
-      *) PKG="$m" ;;
-    esac
-    break
+if [ "$SYS" = 'macos' ]; then
+  # A curl|sh (or ssh) shell often lacks the managers' bin dirs, so look in
+  # their standard prefixes, not just PATH. Homebrew: /opt/homebrew (Apple
+  # Silicon) or /usr/local (legacy Intel); MacPorts: /opt/local.
+  MAC_BREW=''
+  for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [ -x "$b" ]; then MAC_BREW="$b"; break; fi
+  done
+  [ -n "$MAC_BREW" ] || MAC_BREW="$(command -v brew 2>/dev/null || true)"
+  MAC_PORT=''
+  if [ -x /opt/local/bin/port ]; then MAC_PORT=/opt/local/bin/port
+  else MAC_PORT="$(command -v port 2>/dev/null || true)"; fi
+  # hw.optional.arm64 is 1 on Apple Silicon even under Rosetta, and an
+  # unknown oid on Intel.
+  MAC_ARM=0
+  [ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" = '1' ] && MAC_ARM=1
+
+  MAC_PREF="${VIMTUTOR_MACOS_PKG_MGR:-${DOTS_MACOS_PKG_MGR:-}}"
+  case "$MAC_PREF" in
+    '') ;;
+    brew)
+      if [ -n "$MAC_BREW" ]; then PKG=brew
+      else warn "VIMTUTOR_MACOS_PKG_MGR=brew, but Homebrew is not installed; choosing automatically"; fi ;;
+    port)
+      if [ -n "$MAC_PORT" ]; then PKG=port
+      else warn "VIMTUTOR_MACOS_PKG_MGR=port, but MacPorts is not installed; choosing automatically"; fi ;;
+    *) die "VIMTUTOR_MACOS_PKG_MGR must be brew or port (got: $MAC_PREF)" ;;
+  esac
+  if [ -z "$PKG" ]; then
+    if [ -n "$MAC_BREW" ] && [ -n "$MAC_PORT" ]; then
+      if [ "$MAC_ARM" -eq 1 ]; then PKG=brew; else PKG=port; fi
+    elif [ -n "$MAC_BREW" ]; then PKG=brew
+    elif [ -n "$MAC_PORT" ]; then PKG=port
+    fi
   fi
-done
+  # The chosen manager's bin dir goes first, so editors it installed (or
+  # installs below) win over Apple's /usr/bin/vim -- as in an interactive
+  # shell set up by its own instructions.
+  case "$PKG" in
+    brew) PATH="$(dirname "$MAC_BREW"):$PATH" ;;
+    port) mac_bin="$(dirname "$MAC_PORT")"; PATH="$mac_bin:${mac_bin%/bin}/sbin:$PATH" ;;
+  esac
+  export PATH
+else
+  for m in apt-get dnf yum zypper pacman apk brew; do
+    if command -v "$m" >/dev/null 2>&1; then
+      case "$m" in
+        apt-get) PKG=apt ;;
+        *) PKG="$m" ;;
+      esac
+      break
+    fi
+  done
+fi
 
 # Passwordless privilege escalation, or none (we do NOT prompt in curl|sh).
 SUDO=''
@@ -133,15 +183,16 @@ pkg_install() {
     pacman) cmd_args='-S --noconfirm' ;;
     apk)    cmd_args='add' ;;
     brew)   cmd_args='install' ;;
+    port)   cmd_args='-N install' ;;
   esac
   case "$mgr" in
-    apt|dnf|yum|zypper) prefix="$SUDO" ;;
+    apt|dnf|yum|zypper|port) prefix="$SUDO" ;;
     *) prefix='' ;;  # pacman/apk/brew: root via sudo only when already root
   esac
   if [ "$mgr" = 'pacman' ] && [ -n "$SUDO" ]; then prefix='sudo'; fi
   if [ "$mgr" = 'apk' ] && [ -n "$SUDO" ]; then prefix='sudo'; fi
   if [ "$mgr" != 'brew' ] && [ -z "$prefix" ] && [ "$NO_PASSWORD" -eq 1 ] && [ "$(id -u)" != '0' ] && [ "$mgr" != 'brew' ]; then
-    warn "no passwordless root available; run manually: $mgr $cmd_args $*"
+    warn "no passwordless root available; run manually: sudo $mgr $cmd_args $*"
     MISSING_SYSTEM=1
     return 0
   fi
@@ -181,6 +232,7 @@ pkg_pkgs() {
     case "$mgr:$p" in
       dnf:vim|yum:vim) n='vim-enhanced' ;;
       brew:node) n='node' ;;
+      port:node) n='nodejs24' ;;  # MacPorts only ships versioned node ports
       brew:ripgrep) n='ripgrep' ;;
     esac
     _out="$_out $n"
@@ -226,6 +278,7 @@ step "install root: $HOME_DIR"
 # --- system packages ---------------------------------------------------------
 
 step "checking system dependencies"
+say "package manager: ${PKG:-none found}"
 have() { command -v "$1" >/dev/null 2>&1; }
 MISSING_SYSTEM=0
 
@@ -236,8 +289,14 @@ if [ "$SYS" = 'linux' ] && [ -z "$PKG" ]; then
   MISSING_SYSTEM=1
 fi
 if [ "$SYS" = 'macos' ] && [ -z "$PKG" ]; then
-  warn "Homebrew not found; install it from https://brew.sh, then re-run"
-  say "  brew install git curl neovim vim node"
+  if [ "$MAC_ARM" -eq 1 ]; then
+    warn "no package manager found; install Homebrew (https://brew.sh), then re-run"
+    say "  brew install git curl neovim vim node"
+  else
+    warn "no package manager found; Homebrew no longer supports Intel Macs --"
+    say "install MacPorts (https://www.macports.org/install.php), then re-run"
+    say "  sudo port install git curl neovim vim nodejs24"
+  fi
   MISSING_SYSTEM=1
 fi
 
@@ -278,7 +337,11 @@ if have node; then
   fi
 else
   warn "node missing: coc.nvim (completion/LSP) cannot run without it."
-  say "install node >= 18 (e.g. from nodejs.org or your distro), then re-run setup."
+  case "$PKG" in
+    port) say "install node >= 18 (e.g. sudo port install nodejs24), then re-run setup." ;;
+    brew) say "install node >= 18 (e.g. brew install node), then re-run setup." ;;
+    *)    say "install node >= 18 (e.g. from nodejs.org or your distro), then re-run setup." ;;
+  esac
 fi
 
 # Editors present? (after installs)
@@ -383,7 +446,7 @@ command -v git >/dev/null 2>&1 || warn "git not available; use --repo with a loc
 # --- vim-plug bootstrap -------------------------------------------------------
 
 step "fetching vim-plug (the in-editor plugin manager)"
-mkdir -p "$HOME_DIR/autoload"
+run mkdir -p "$HOME_DIR/autoload"
 PLUG_TARGET="$HOME_DIR/autoload/plug.vim"
 if [ -f "$PLUG_TARGET" ]; then
   say "plug.vim already present"
@@ -401,7 +464,7 @@ fi
 
 wire_vim_file() {  # wire_vim_file <path> <fresh>
   f="$1"
-  if grep -qF "$BEG" "$f"; then
+  if grep -qF "$BEG" "$f" 2>/dev/null; then
     say "already wired: $f"
     return 0
   fi
@@ -434,7 +497,7 @@ VIMEOF
 
 wire_lua_file() {  # wire_lua_file <path> <fresh>
   f="$1"
-  if grep -qF "$BEG" "$f"; then
+  if grep -qF "$BEG" "$f" 2>/dev/null; then
     say "already wired: $f"
     return 0
   fi
@@ -476,7 +539,7 @@ if [ -n "$VIM_BIN" ] || [ "$MODE" != 'nvim' ]; then
     elif [ -f "$HOME/.vim/vimrc" ]; then
       wire_vim_file "$HOME/.vim/vimrc" existing
     else
-      touch "$HOME/.vimrc"
+      run touch "$HOME/.vimrc"
       wire_vim_file "$HOME/.vimrc" fresh
     fi
     VIMRC_WIRED=1
@@ -485,7 +548,7 @@ fi
 
 if [ "$MODE" = 'nvim' ] || [ "$MODE" = 'both' ]; then
   cfgdir="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
-  mkdir -p "$cfgdir"
+  run mkdir -p "$cfgdir"
   if [ -f "$cfgdir/init.lua" ]; then
     # Neovim reads init.lua INSTEAD of init.vim -- wire into the lua file.
     wire_lua_file "$cfgdir/init.lua" existing
@@ -494,7 +557,9 @@ if [ "$MODE" = 'nvim' ] || [ "$MODE" = 'both' ]; then
     wire_vim_file "$cfgdir/init.vim" existing
     NVIMRC_WIRED="$cfgdir/init.vim"
   else
-    echo '" created by vimtutor setup.sh' > "$cfgdir/init.vim"
+    if [ "$DRY_RUN" -eq 0 ]; then
+      echo '" created by vimtutor setup.sh' > "$cfgdir/init.vim"
+    fi
     wire_vim_file "$cfgdir/init.vim" existing
     NVIMRC_WIRED="$cfgdir/init.vim"
   fi
