@@ -28,6 +28,27 @@ if stridx(&runtimepath, s:tutor_home) == -1
   execute 'set runtimepath^=' . fnameescape(s:tutor_home)
 endif
 
+" Scala 3 toolchain (Lesson 12, step 7), installed by `setup.sh
+" --with-scala` into g:vimtutor_data/scala: its bin dir (cs, metals,
+" scala-cli) joins this editor's $PATH, and -- only when setup.sh had to
+" fetch a JDK because none >= 17 was around -- $JAVA_HOME points at that
+" JDK. Child processes (coc's language servers, :terminal, :!) inherit
+" both, so nothing in your shell profile has to change.
+let s:scala_dir = g:vimtutor_data . '/scala'
+if isdirectory(s:scala_dir . '/bin')
+      \ && stridx($PATH, s:scala_dir . '/bin') == -1
+  let $PATH = s:scala_dir . '/bin:' . $PATH
+endif
+if filereadable(s:scala_dir . '/java-home')
+  let s:scala_jdk = get(readfile(s:scala_dir . '/java-home'), 0, '')
+  if isdirectory(s:scala_jdk . '/bin')
+    let $JAVA_HOME = s:scala_jdk
+    if stridx($PATH, s:scala_jdk . '/bin') == -1
+      let $PATH = s:scala_jdk . '/bin:' . $PATH
+    endif
+  endif
+endif
+
 " --- 1. options that matter --------------------------------------------------
 
 if !has('nvim')
@@ -71,6 +92,11 @@ set path+=**
 set backspace=indent,eol,start
 set tabstop=4 shiftwidth=4 expandtab
 set smartindent
+" Scala's community style is two spaces (sleuth still adapts to the file).
+augroup vimtutor_scala
+  autocmd!
+  autocmd FileType scala,sbt setlocal tabstop=2 shiftwidth=2 softtabstop=2
+augroup END
 set breakindent showbreak=..
 if !has('nvim')
   set nolazyredraw
@@ -92,9 +118,38 @@ if has('termguicolors') && s:tgc
   set termguicolors
 endif
 
+" Who owns the look (colorscheme + status line)? g:vimtutor_ui:
+"   'auto' (default) vimtutor's theme and lualine apply only when your own
+"          config set neither a colorscheme nor a status line by VimEnter;
+"          vim-airline still loads (it hooks in at load time, before your
+"          config has run).
+"   'on'   always apply vimtutor's look.
+"   'off'  never touch it: no colorscheme, no status line, no airline /
+"          lualine / colorscheme plugins. Dotfiles that manage their own UI
+"          (tharant/dots does) set this before sourcing this file.
+let g:vimtutor_ui = get(g:, 'vimtutor_ui', 'auto')
+if index(['auto', 'on', 'off'], g:vimtutor_ui) < 0
+  echom "vimtutor: g:vimtutor_ui must be auto, on or off -- using 'auto'"
+  let g:vimtutor_ui = 'auto'
+endif
+
 " A decent bare status line; airline/lualine replace it when installed.
-set laststatus=2
-set statusline=%<\ %f\ %y\ %m%r%=%-10.(%l,%c%V%)\ %P
+let s:bare_statusline = '%< %f %y %m%r%=%-10.(%l,%c%V%) %P'
+if g:vimtutor_ui !=# 'off'
+  set laststatus=2
+  let &statusline = s:bare_statusline
+endif
+
+" True when vimtutor may style the editor now (see g:vimtutor_ui): 'auto'
+" asks whether your config, which runs after this file, set its own.
+function! s:UiIsOurs(what) abort
+  if g:vimtutor_ui ==# 'on' | return 1 | endif
+  if g:vimtutor_ui ==# 'off' | return 0 | endif
+  if a:what ==# 'colorscheme'
+    return !exists('g:colors_name') || g:colors_name ==# 'default'
+  endif
+  return &g:statusline ==# s:bare_statusline
+endfunction
 
 " --- 2. your keys ------------------------------------------------------------
 
@@ -176,7 +231,11 @@ else
     call plug#begin(g:vimtutor_plugdir)
 
     " Completion + LSP client: one engine for both editors. Needs Node 18+.
-    Plug 'neoclide/coc.nvim', {'branch': 'release'}
+    " Skipped under sudo/doas: $HOME stays yours (macOS keeps it), so coc
+    " would write ~/.config/coc and ~/.npm as root. Use `sudoedit` instead.
+    if empty($SUDO_USER) && empty($DOAS_USER)
+      Plug 'neoclide/coc.nvim', {'branch': 'release'}
+    endif
 
     " Editor-grade syntax highlighting:
     if has('nvim')
@@ -185,19 +244,20 @@ else
       Plug 'sheerun/vim-polyglot'
     endif
 
-    " Status line:
-    if has('nvim')
-      Plug 'nvim-lualine/lualine.nvim'
-    else
-      Plug 'vim-airline/vim-airline'
-      " No powerline glyphs: readable on every stock terminal font.
-      let g:airline_powerline_fonts = 0
-    endif
-
-    " Colorschemes (tokyonight is Neovim-only; gruvbox is universal).
-    Plug 'morhetz/gruvbox'
-    if has('nvim')
-      Plug 'folke/tokyonight.nvim'
+    " Status line + colorschemes (tokyonight is Neovim-only; gruvbox is
+    " universal) -- none of them when your config owns the look.
+    if g:vimtutor_ui !=# 'off'
+      if has('nvim')
+        Plug 'nvim-lualine/lualine.nvim'
+      else
+        Plug 'vim-airline/vim-airline'
+        " No powerline glyphs: readable on every stock terminal font.
+        let g:airline_powerline_fonts = 0
+      endif
+      Plug 'morhetz/gruvbox'
+      if has('nvim')
+        Plug 'folke/tokyonight.nvim'
+      endif
     endif
 
     " Editor quality-of-life (small, no config needed):
@@ -220,12 +280,14 @@ else
 
   " Friendly first-run nudge, exactly once.
   autocmd VimEnter * ++once
-        \ if empty(globpath(g:vimtutor_plugdir, '*'))
+        \ if empty($SUDO_USER) && empty(globpath(g:vimtutor_plugdir, '*'))
         \ |   echom 'vimtutor: plugins not installed yet -- run :PlugInstall'
         \ | endif
 
-  " Apply the default theme now that colorschemes are on the rtp.
-  autocmd VimEnter * ++once call s:VimtutorTheme(g:vimtutor_theme, 0)
+  " Apply the default theme now that colorschemes are on the rtp -- unless
+  " your config already chose one (g:vimtutor_ui).
+  autocmd VimEnter * ++once
+        \ if s:UiIsOurs('colorscheme') | call s:VimtutorTheme(g:vimtutor_theme, 0) | endif
 endif
 
 " --- 5. per-plugin configuration ----------------------------------------------
@@ -233,10 +295,30 @@ endif
 " coc.nvim: completion, LSP, diagnostics (Lesson 12). Keymaps appear only
 " when the plugin is actually installed, so Tab keeps working meanwhile.
 if isdirectory(g:vimtutor_plugdir . '/coc.nvim')
+      \ && empty($SUDO_USER) && empty($DOAS_USER)
   " Suggested extensions auto-installed at startup (needs node).
   if executable('node')
     let g:coc_global_extensions =
           \ get(g:, 'coc_global_extensions', ['coc-json', 'coc-tsserver'])
+  endif
+
+  " Scala 3 via Metals (Lesson 12, step 7). The coc-metals extension is
+  " deprecated and unmaintained, so coc's generic language-server client
+  " drives the Coursier-installed metals launcher directly -- the same in
+  " both editors. Guarded on the binary: nothing changes until `setup.sh
+  " --with-scala` (or your own `cs install metals`) puts it on $PATH.
+  " Metals needs Java 17+; scala-cli on $PATH lets it import single-file
+  " projects (`//> using` directives, project.scala).
+  if executable('metals')
+    let g:coc_user_config = get(g:, 'coc_user_config', {})
+    let g:coc_user_config.languageserver =
+          \ get(g:coc_user_config, 'languageserver', {})
+    let g:coc_user_config.languageserver.metals = {
+          \ 'command': exepath('metals'),
+          \ 'filetypes': ['scala', 'sbt'],
+          \ 'rootPatterns': ['build.sbt', 'build.sc', 'build.mill',
+          \                  'project.scala', '.bsp', '.scala-build', '.git'],
+          \ }
   endif
 
   " Navigation (Lesson 12)
@@ -277,9 +359,11 @@ if has('nvim') && isdirectory(g:vimtutor_plugdir . '/nvim-treesitter')
   lua << EOTS
   local ok, ts = pcall(require, 'nvim-treesitter.configs')
   if ok then
+    -- sbt build files are Scala: reuse its parser (Lesson 12, step 7).
+    pcall(vim.treesitter.language.register, 'scala', 'sbt')
     ts.setup({
       ensure_installed = { 'bash', 'c', 'lua', 'markdown', 'markdown_inline',
-                           'python', 'query', 'vim', 'vimdoc' },
+                           'python', 'query', 'scala', 'vim', 'vimdoc' },
       highlight = { enable = true },
       indent = { enable = true },
     })
@@ -288,8 +372,10 @@ EOTS
 endif
 
 " lualine (Neovim status line) ships with sane defaults; just make it
-" feel like the vim counterpart.
-if has('nvim') && isdirectory(g:vimtutor_plugdir . '/lualine.nvim')
+" feel like the vim counterpart. Set up at VimEnter, after your config,
+" and only when it left the status line to us (g:vimtutor_ui).
+function! s:SetupLualine() abort
+  if !s:UiIsOurs('statusline') | return | endif
   lua << EOLUA
   local ok, lualine = pcall(require, 'lualine')
   if ok then
@@ -302,6 +388,10 @@ if has('nvim') && isdirectory(g:vimtutor_plugdir . '/lualine.nvim')
     })
   end
 EOLUA
+endfunction
+if has('nvim') && g:vimtutor_ui !=# 'off'
+      \ && isdirectory(g:vimtutor_plugdir . '/lualine.nvim')
+  autocmd VimEnter * ++once call s:SetupLualine()
 endif
 
 " fzf (both editors, if the binary exists): files + content, fast.

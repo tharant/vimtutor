@@ -8,8 +8,10 @@ tags
 scratch/
 *.bak
 
-# Downloaded by setup.sh in dev/link installs (vendored plug.vim)
+# Downloaded by setup.sh in dev/link installs (vendored plug.vim), and the
+# --with-scala toolchain (cs, metals, scala-cli, java-home)
 autoload/plug.vim
+scala/
 
 # Local redaction map for the agent log (PERSONAL -- never commit)
 .agentlog-redactions

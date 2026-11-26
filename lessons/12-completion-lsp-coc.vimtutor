@@ -32,7 +32,7 @@
      ~
      ~   :CocList diagnostics<Enter>     every problem, searchable list
      ~     j k to move, <Enter> to jump, q to close the list
-     ~   ]d  /  [d                        next / previous diagnostic
+     ~   ]g  /  [g                        next / previous diagnostic
      ~
      ~  The signs in the sign column next to line numbers are coc's
      ~  live diagnostics (E/W/I). They turn on with the plugin -- no
@@ -89,13 +89,46 @@
      ~ so keys match across both editors. Also: coc needs a modern Node
      ~ (18+). If popups never appear, :CocInfo and :checkhealth will say.
 
+  7. Scala 3 with Metals -- a JVM language, same keys:
+     ~
+     ~  Metals is the Scala language server. Its old coc extension is
+     ~  dead, so your config hands coc the metals launcher directly
+     ~  (:CocInfo lists it as "metals"). It needs a one-time install:
+     ~
+     ~   sh setup.sh --with-scala        Coursier + Metals + scala-cli,
+     ~                                   plus a JDK 17+ only if none is
+     ~                                   found (sdkman's comes first)
+     ~
+     ~  Then, from this lesson:
+     ~
+     ~   :e demo/lang-demo.scala<Enter>  enum, extension, @main -- Scala 3
+     ~   :cd %:p:h                       the demo dir becomes the root
+     ~   :!scala-cli setup-ide .         tell Metals how to build it
+     ~   :CocRestart                     Metals imports (status: :CocInfo)
+     ~
+     ~  The first import downloads the compiler and can take a minute.
+     ~  After that every key from steps 1-5 works unchanged: K on area,
+     ~  gd on Shape, gr on describe, <leader>rn to rename a case, and
+     ~  completion after "shapes." -- one muscle memory for every
+     ~  language. Run the program from the editor:
+     ~
+     ~   :!scala-cli run .               compile + run, output below
+     ~   :term scala-cli repl .          a REPL with the demo loaded
+     ~
+     ~ NOTE: Scala files indent by 2 (community style). In Neovim the
+     ~ tree-sitter "scala" parser highlights them (:TSInstall scala if
+     ~ :PlugInstall ran before Scala support existed); Vim uses
+     ~ vim-polyglot. sbt/Mill projects work too: open a file inside the
+     ~ project and Metals offers to import the build.
+
   SUMMARY -- Lesson 12
 
   ~ Ctrl-Space Ctrl-N Ctrl-P Tab     trigger, choose, accept
   ~ K gd gr gy gi Ctrl-O             hover / definition / references / back
-  ~ :CocList diagnostics ]d [d       see and traverse every problem
+  ~ :CocList diagnostics ]g [g       see and traverse every problem
   ~ <Leader>rn <Leader>ac <Leader>qf  rename, act, quickfix
   ~ :CocList outline :CocCommand     structure and the command palette
   ~ :CocInstall :CocConfig :CocInfo  extend, configure, troubleshoot
+  ~ setup.sh --with-scala            Scala 3: Metals + scala-cli, step 7
 
 ================================================================================

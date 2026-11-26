@@ -25,6 +25,9 @@
 #                            (deletes the install dir first)
 #   --link                   dev helper: symlink a local --repo instead of copy
 #   --with-tools             also install fzf + ripgrep when the pkg mgr has them
+#   --with-scala             also install the Scala 3 toolchain into the
+#                            install root: Coursier, Metals, scala-cli, plus
+#                            a JDK only when no Java 17+ is found (network!)
 #   --no-pkg                 never touch system packages (print commands only)
 #   --auto-install-plugins   run :PlugInstall --sync right now (network!)
 #   --uninstall              remove the vimtutor blocks from your init files
@@ -46,6 +49,7 @@ REPO_ARG=''
 HOME_DIR="${VIMTUTOR_HOME:-}"
 MODE='both'
 WITH_TOOLS=0
+WITH_SCALA=0
 NO_PKG=0
 AUTO_PLUGINS=0
 DRY_RUN=0
@@ -69,7 +73,7 @@ run() {
 }
 
 usage() {
-  sed -n '3,38p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,41p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 }
 
@@ -83,6 +87,7 @@ while [ $# -gt 0 ]; do
     --link)   LINK=1 ;;
     --refresh) REFRESH=1 ;;
     --with-tools) WITH_TOOLS=1 ;;
+    --with-scala) WITH_SCALA=1 ;;
     --no-pkg) NO_PKG=1 ;;
     --auto-install-plugins) AUTO_PLUGINS=1 ;;
     --uninstall) UNINSTALL=1 ;;
@@ -460,6 +465,169 @@ else
   fi
 fi
 
+# --- optional: Scala 3 toolchain (Lesson 12, step 7) ---------------------------
+#
+# Opt-in (--with-scala). Everything lands in $HOME_DIR/scala: the Coursier
+# launcher (cs) and the metals + scala-cli launchers it installs; Coursier
+# keeps its download cache in its usual place (~/.cache/coursier, or
+# ~/Library/Caches/Coursier on macOS). Metals needs Java 17+, and the
+# first JDK found wins:
+#   1. $JAVA_HOME
+#   2. java on PATH (macOS: /usr/libexec/java_home, never the bare stub)
+#   3. an sdkman JDK under ${SDKMAN_DIR:-~/.sdkman}, `current` first
+#   4. the dots repo's `~/bin/runtimes install java <major>` (sdkman-backed)
+#   5. a JDK fetched by Coursier (cs java-home --jvm <major>)
+# Cases 3-5 are recorded in $HOME_DIR/scala/java-home, which
+# config/vimrc.common exports as $JAVA_HOME inside the editor.
+
+SCALA_JDK="${VIMTUTOR_SCALA_JDK:-21}"
+SCALA_DIR="$HOME_DIR/scala"
+SCALA_STATUS=''
+
+java_major() {  # java_major <java-binary>: print its major version, or fail
+  _v="$("$1" -XshowSettings:properties -version 2>&1 \
+    | sed -n 's/^ *java\.specification\.version = *//p' | head -n 1)"
+  case "$_v" in 1.*) _v="${_v#1.}" ;; esac
+  _v="${_v%%.*}"
+  case "$_v" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$_v"
+}
+
+java_ok() {  # java_ok <java-home>: true when <java-home>/bin/java is 17+
+  [ -x "$1/bin/java" ] || return 1
+  _m="$(java_major "$1/bin/java")" || return 1
+  [ "$_m" -ge 17 ]
+}
+
+sdkman_jdk() {  # print the best sdkman JDK home that is 17+, or fail
+  _c="${SDKMAN_DIR:-$HOME/.sdkman}/candidates/java"
+  [ -d "$_c" ] || return 1
+  if java_ok "$_c/current"; then printf '%s' "$_c/current"; return 0; fi
+  _best=''
+  for _d in "$_c"/*; do
+    [ "$(basename "$_d")" = 'current' ] && continue
+    if java_ok "$_d"; then _best="$_d"; fi  # lexical glob: keep the newest
+  done
+  [ -n "$_best" ] || return 1
+  printf '%s' "$_best"
+}
+
+path_java_ok() {  # true when the java on PATH (or macOS's registry) is 17+
+  _j="$(command -v java 2>/dev/null || true)"
+  if [ "$SYS" = 'macos' ] && { [ -z "$_j" ] || [ "$_j" = '/usr/bin/java' ]; }; then
+    # /usr/bin/java is a stub that may pop up an "install Java" dialog;
+    # ask the JDK registry instead.
+    _h="$(/usr/libexec/java_home -v 17+ 2>/dev/null || true)"
+    [ -n "$_h" ] && java_ok "$_h"
+    return
+  fi
+  [ -n "$_j" ] || return 1
+  _m="$(java_major "$_j")" || return 1
+  [ "$_m" -ge 17 ]
+}
+
+scala_install() {
+  case "$(uname -m)" in
+    x86_64|amd64)  cs_arch=x86_64 ;;
+    arm64|aarch64) cs_arch=aarch64 ;;
+    *)             cs_arch='' ;;
+  esac
+  case "$SYS" in
+    macos) cs_os=apple-darwin ;;
+    linux)
+      if ls /lib/ld-musl-* >/dev/null 2>&1; then cs_os=pc-linux-static
+      else cs_os=pc-linux; fi ;;
+    *) cs_os='' ;;
+  esac
+  if [ -z "$cs_arch" ] || [ -z "$cs_os" ]; then
+    warn "no Coursier launcher for $(uname -s)/$(uname -m); Scala skipped"
+    SCALA_STATUS='skipped: unsupported platform'
+    return 0
+  fi
+  have curl || { warn "curl missing; Scala skipped"; SCALA_STATUS='skipped: no curl'; return 0; }
+  have gzip || { warn "gzip missing; Scala skipped"; SCALA_STATUS='skipped: no gzip'; return 0; }
+
+  run mkdir -p "$SCALA_DIR/bin"
+  CS="$SCALA_DIR/bin/cs"
+  if [ -x "$CS" ]; then
+    say "Coursier already present: $CS"
+  else
+    cs_url="https://github.com/coursier/coursier/releases/latest/download/cs-$cs_arch-$cs_os.gz"
+    say "downloading Coursier: $cs_url"
+    if [ "$DRY_RUN" -eq 0 ]; then
+      if ! curl -fsSL --proto '=https' --tlsv1.2 --retry 2 -o "$CS.gz" "$cs_url" \
+          || ! gzip -dc "$CS.gz" > "$CS.tmp" || [ ! -s "$CS.tmp" ]; then
+        rm -f "$CS.gz" "$CS.tmp"
+        warn "could not download Coursier; Scala skipped (re-run to retry)"
+        SCALA_STATUS='failed: Coursier download'
+        return 0
+      fi
+      rm -f "$CS.gz"
+      chmod +x "$CS.tmp"
+      mv "$CS.tmp" "$CS"
+    fi
+  fi
+
+  # Java 17+ for Metals (order in the header above).
+  jdk=''
+  shell_jdk=0  # 1: the shell already provides a Java 17+ (nothing to record)
+  if [ -n "${JAVA_HOME:-}" ] && java_ok "$JAVA_HOME"; then
+    shell_jdk=1; say "JDK: \$JAVA_HOME ($JAVA_HOME)"
+  elif path_java_ok; then
+    shell_jdk=1; say "JDK: java on PATH ($(command -v java))"
+  elif jdk="$(sdkman_jdk)"; then
+    say "JDK: sdkman ($jdk)"
+  elif [ -x "$HOME/bin/runtimes" ] \
+      && [ -f "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ]; then
+    say "JDK: none >= 17; installing java $SCALA_JDK via the dots runtimes CLI (sdkman)"
+    if run "$HOME/bin/runtimes" install java "$SCALA_JDK"; then
+      jdk="$(sdkman_jdk || true)"
+    fi
+    [ -n "$jdk" ] || [ "$DRY_RUN" -eq 1 ] \
+      || warn "runtimes did not leave a Java 17+ in sdkman; falling back to Coursier"
+  fi
+  if [ -z "$jdk" ] && [ "$shell_jdk" -eq 0 ]; then
+    say "JDK: fetching Java $SCALA_JDK with Coursier (cs java-home --jvm $SCALA_JDK)"
+    if [ "$DRY_RUN" -eq 1 ]; then
+      say "(dry-run) skipped"
+    elif ! jdk="$("$CS" java-home --jvm "$SCALA_JDK")" || [ ! -d "$jdk" ]; then
+      warn "could not fetch a JDK; Metals will not start until Java 17+ is installed"
+      jdk=''
+    fi
+  fi
+  if [ -n "$jdk" ]; then
+    if [ "$DRY_RUN" -eq 0 ]; then
+      printf '%s\n' "$jdk" > "$SCALA_DIR/java-home"
+      say "recorded for the editor: $SCALA_DIR/java-home"
+    else
+      say "(dry-run) would record $jdk in $SCALA_DIR/java-home"
+    fi
+  else
+    # A JDK the shell already provides wins; drop a stale record.
+    run rm -f "$SCALA_DIR/java-home"
+  fi
+
+  if [ -x "$SCALA_DIR/bin/metals" ] && [ -x "$SCALA_DIR/bin/scala-cli" ]; then
+    say "metals + scala-cli already installed (update: $CS update --install-dir $SCALA_DIR/bin)"
+  else
+    say "installing metals + scala-cli into $SCALA_DIR/bin"
+    if [ -n "$jdk" ]; then
+      run env JAVA_HOME="$jdk" PATH="$jdk/bin:$PATH" \
+        "$CS" install --install-dir "$SCALA_DIR/bin" metals scala-cli \
+        || { warn "cs install failed; re-run setup.sh --with-scala"; SCALA_STATUS='failed: cs install'; return 0; }
+    else
+      run "$CS" install --install-dir "$SCALA_DIR/bin" metals scala-cli \
+        || { warn "cs install failed; re-run setup.sh --with-scala"; SCALA_STATUS='failed: cs install'; return 0; }
+    fi
+  fi
+  SCALA_STATUS="ready: $SCALA_DIR/bin"
+}
+
+if [ "$WITH_SCALA" -eq 1 ]; then
+  step "installing the Scala 3 toolchain (Coursier, Metals, scala-cli)"
+  scala_install
+fi
+
 # --- wire editor configs -------------------------------------------------------
 
 wire_vim_file() {  # wire_vim_file <path> <fresh>
@@ -612,6 +780,7 @@ if [ -n "$VIMRC_WIRED" ]; then
   fi
 fi
 [ -n "$NVIMRC_WIRED" ] && say "  neovim: $NVIMRC_WIRED"
+[ -n "$SCALA_STATUS" ] && say "  scala:  $SCALA_STATUS (Lesson 12, step 7)"
 if [ "$MISSING_SYSTEM" -eq 1 ]; then
   warn "some system packages were NOT installed (see the !! lines above)."
   say "install them, then re-run setup.sh --editor=$MODE to finish."

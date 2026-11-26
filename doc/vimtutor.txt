@@ -82,6 +82,24 @@ g:vimtutor_open                                      *g:vimtutor_open*
         How the first lesson opens: "tab" (default, keeps your layout)
         or "split" (a regular window).
 
+g:vimtutor_ui                                          *g:vimtutor_ui*
+        Who owns the colorscheme and status line; set it before the
+        shared config is sourced.
+            "auto"  (default) vimtutor's theme and lualine apply only
+                    when your config set neither a colorscheme nor a
+                    status line by VimEnter (vim-airline still loads).
+            "on"    always apply vimtutor's look.
+            "off"   never touch them; the airline/lualine/colorscheme
+                    plugins are not even loaded.
+
+Scala 3                                                *vimtutor-scala*
+        `setup.sh --with-scala` installs Coursier, Metals and scala-cli
+        into {data}/scala/bin, plus a JDK 17+ only when none is found
+        (an sdkman JDK or the dots `runtimes` CLI comes first). The
+        shared config puts that bin dir on $PATH, exports the recorded
+        JDK as $JAVA_HOME, and registers Metals with coc for scala and
+        sbt buffers. Lesson 12, step 7 walks through it.
+
 ===============================================================================
 5. NEOVIM/VIM DIFFERENCES                                    *vimtutor-editors*
 
@@ -92,6 +110,8 @@ editor-sensitive pieces live in the config the setup script installs
 - syntax highlighting is vim-polyglot on Vim, nvim-treesitter on Neovim
 - the status line is vim-airline on Vim, lualine on Neovim
 - tokyonight is a Neovim-only colorscheme; gruvbox works on both
+- Scala highlighting is tree-sitter (scala parser, also for sbt) on
+  Neovim and vim-polyglot on Vim; Metals runs through coc on both
 - coc.nvim (completion/LSP) and fzf.vim (if present) run on both
 
 ===============================================================================
