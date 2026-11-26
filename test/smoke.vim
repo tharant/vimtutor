@@ -23,6 +23,11 @@ endfunction
 
 call s:check(':Tutor command defined', exists(':Tutor') == 2)
 call s:check(':TutorClassic command defined', exists(':TutorClassic') == 2)
+" The stock tutor plugin (plugin/tutor.vim in both editors) also defines
+" :Tutor; ours must be the one that survives startup, whatever the
+" 'runtimepath' order. exists() alone cannot tell the two apart.
+call s:check(':Tutor is ours, not the stock tutor',
+      \ execute('command Tutor') =~# 'vimtutor#start')
 call s:check('plugin set g:vimtutor_home', exists('g:vimtutor_home'))
 call s:check('lesson list finds the index',
       \ exists('g:vimtutor_home') && !empty(vimtutor#lessons()))
@@ -80,6 +85,12 @@ call s:check('bad arg falls back to the index', expand('%:t') =~# '^00-')
 " 7. Completion is wired to the real lesson list.
 let s:comp = vimtutor#complete('', '', 0)
 call s:check('completion lists all lessons', len(s:comp) == len(vimtutor#lessons()))
+
+" 8. :TutorClassic reaches the stock tutor. Its autoload is not loaded yet
+"    at this point, so this also guards against an exists('*tutor#...')
+"    check (which never autoloads) declaring it unavailable.
+silent! TutorClassic
+call s:check(':TutorClassic opens the stock tutor', &filetype ==# 'tutor')
 
 call add(s:log, (s:fail ? '== SMOKE FAILED ==' : '== SMOKE OK =='))
 if !empty($VIMTUTOR_TEST_LOG)

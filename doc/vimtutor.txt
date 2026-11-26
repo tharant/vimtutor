@@ -21,9 +21,10 @@ CONTENTS                                                     *vimtutor-contents*
             a name fragment      :Tutor splits
             nothing              the index
         Tab completion lists every lesson either way. The command is
-        defined by this plugin (plugin/vimtutor.vim) and -- because the
-        plugin directory is APPENDED to 'runtimepath' -- it overrides
-        the stock markdown :Tutor that ships with Vim 9 and Neovim.
+        defined by this plugin (plugin/vimtutor.vim) and replaces the
+        stock markdown :Tutor that ships with Vim 9 and Neovim, whatever
+        the 'runtimepath' order: the plugin sets the stock plugin's load
+        guard (g:loaded_tutor_mode_plugin) so that one skips itself.
 
 :TutorClassic [target]
         The stock interactive tutorial that ships with the editor
