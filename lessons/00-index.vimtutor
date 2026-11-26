@@ -52,7 +52,7 @@
   |09|  Your config file: mappings, plugins, colorschemes
   |10|  Files, :args, sessions, and netrw
   |11|  Terminals and git (fugitive)
-  |12|  Completion and LSP with coc.nvim
+  |12|  Completion and LSP with coc.nvim (incl. Scala 3 / Metals)
   |13|  Cheat sheet: the advanced keys on one page
 
   Shortcuts:  :Tutor 13  for the cheat sheet at any time,  :Tutor 9  to

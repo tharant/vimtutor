@@ -30,6 +30,23 @@ call s:check('coc keys NOT mapped (plugin missing)',
 call s:check('runtimepath contains tutor home',
       \ !empty($VIMTUTOR_TEST_REPO) && stridx(&runtimepath, $VIMTUTOR_TEST_REPO) >= 0)
 
+
+" Scala 3 toolchain wiring (fake install made by config_check.sh).
+call s:check('scala bin dir leads $PATH',
+      \ stridx($PATH, g:vimtutor_data . '/scala/bin') >= 0)
+call s:check('metals resolves from the scala bin dir',
+      \ exepath('metals') ==# g:vimtutor_data . '/scala/bin/metals')
+call s:check('fetched JDK becomes $JAVA_HOME',
+      \ $JAVA_HOME ==# $VIMTUTOR_TEST_JDK)
+call s:check('fetched JDK bin is on $PATH',
+      \ stridx($PATH, $VIMTUTOR_TEST_JDK . '/bin') >= 0)
+call s:check('no Metals coc config while coc is absent',
+      \ !exists('g:coc_user_config'))
+new
+setfiletype scala
+call s:check('scala buffers indent by 2', &l:shiftwidth == 2)
+bwipe!
+
 call add(s:log, (s:fail ? '== CONFIG CHECK FAILED ==' : '== CONFIG OK =='))
 if !empty($VIMTUTOR_TEST_LOG)
   call writefile(s:log, $VIMTUTOR_TEST_LOG, 'a')

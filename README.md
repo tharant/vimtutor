@@ -38,7 +38,8 @@ MacPorts — see [macOS](#macos) below):
 1. **Installs missing system packages** — `neovim` and/or `vim` (your choice,
    default both), plus `git`/`curl`. Skipped gracefully — with the exact
    commands printed for you to run — when there is no passwordless root
-   (`sudo -n`). Opt in `fzf` + `ripgrep` with `--with-tools`.
+   (`sudo -n`). Opt in `fzf` + `ripgrep` with `--with-tools`, and the Scala 3
+   toolchain with `--with-scala` (see [Scala 3](#scala-3-metals)).
 2. **Checks Node.js** (≥ 18) — `coc.nvim` needs it; you get a pointed warning
    either way (no surprise third-party repositories are ever added).
 3. **Installs the tutor runtime** into `~/.local/share/vimtutor` (override
@@ -79,6 +80,7 @@ endif
 | `--link` | dev helper: symlink a local `--repo` instead of copying |
 | `--refresh` | re-copy an existing local `--repo` install (deletes it first) |
 | `--with-tools` | also install `fzf` + `ripgrep` when available |
+| `--with-scala` | also install the Scala 3 toolchain (Coursier, Metals, scala-cli; a JDK only if none ≥ 17 is found) into `<install root>/scala` |
 | `--no-pkg` | never touch system packages, print commands instead |
 | `--auto-install-plugins` | run `:PlugInstall --sync` headlessly right now |
 | `--uninstall` | remove both managed blocks (keeps backups + the clone; it prints one `rm -rf` for that) |
@@ -106,6 +108,38 @@ so the hint for node is `sudo port install nodejs24`.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tharant/vimtutor/main/setup.sh | VIMTUTOR_MACOS_PKG_MGR=port sh
 ```
+
+### Scala 3 (Metals)
+
+`--with-scala` sets up Lesson 12, step 7. Everything goes into
+`~/.local/share/vimtutor/scala/`; nothing in your shell profile changes:
+
+1. **Coursier** — the native `cs` launcher for your platform, downloaded from
+   [coursier/coursier](https://github.com/coursier/coursier/releases) releases
+   (the static build on musl/Alpine).
+2. **A JDK 17+**, only when needed. The first one found wins:
+   `$JAVA_HOME`; `java` on `PATH` (on macOS via `/usr/libexec/java_home`, never
+   the bare `/usr/bin/java` stub); an **sdkman** JDK (`$SDKMAN_DIR`, default
+   `~/.sdkman`, `current` first); if the [dots](https://github.com/tharant/dots)
+   `~/bin/runtimes` CLI is installed, `runtimes install java 21` (sdkman-backed,
+   so the JDK lands in the same store dots manages); otherwise Coursier fetches
+   one (`cs java-home --jvm 21`). `VIMTUTOR_SCALA_JDK` changes that version.
+   The last three are recorded in `scala/java-home`.
+3. **Metals + scala-cli** — `cs install --install-dir scala/bin metals scala-cli`.
+
+The shared config puts `scala/bin` on the editor's `$PATH` and, when
+`scala/java-home` exists, sets `$JAVA_HOME` — so coc, `:terminal` and `:!` see
+them. Metals is driven by coc's generic language-server client (the
+`coc-metals` extension is deprecated), identically in Vim and Neovim, and only
+when a `metals` binary exists — your own `cs install metals` works too.
+Highlighting: tree-sitter `scala` on Neovim (also used for `sbt`), vim-polyglot
+on Vim. Scala buffers indent by 2.
+
+Re-running is safe (installed pieces are skipped; update with
+`~/.local/share/vimtutor/scala/bin/cs update --install-dir …/scala/bin`).
+Coursier's download cache and any JDK it fetched stay in its usual cache
+(`~/.cache/coursier`, `~/Library/Caches/Coursier` on macOS); Metals and
+scala-cli keep their own caches too.
 
 ## Manual install (no `curl | sh`)
 
@@ -150,7 +184,7 @@ source ~/.local/share/vimtutor/config/vimrc.common
 | 09 | Your config: mappings, plugins, colorschemes (guided tour) |
 | 10 | Files, `:args`, sessions, netrw |
 | 11 | Terminals (`:term`) and git (fugitive) |
-| 12 | Completion and LSP with `coc.nvim` |
+| 12 | Completion and LSP with `coc.nvim` (incl. Scala 3 via Metals) |
 | 13 | Cheat sheet: everything on one page |
 
 Lessons are single files under `lessons/`; the scratch copies (including
@@ -187,6 +221,17 @@ Neovim/after for Vim — your file always wins):
   `<leader>f` format selection; Tab accepts completions, `Ctrl-Space` triggers.
 - `:Theme gruvbox` switches colorschemes (`:Theme name!` persists the choice
   by rewriting the default inside the shared config).
+- **Your look wins** (`g:vimtutor_ui`, set before the managed block sources the
+  config): `'auto'` (default) applies vimtutor's colorscheme and lualine only
+  if your own config set neither a colorscheme nor a status line by the time
+  the editor finished starting (vim-airline still loads on Vim, since it hooks
+  in before your config runs); `'on'` always applies them; `'off'` never
+  touches the colorscheme or status line and skips those plugins — for
+  dotfiles that manage their own UI (tharant/dots sets this).
+- **Under `sudo`/`doas`**, coc is not loaded: macOS `sudo` keeps your `$HOME`,
+  so coc would install extensions into `~/.config/coc` and npm would cache into
+  `~/.npm` as root, leaving both unwritable for you. Use `sudoedit` to edit
+  system files with your setup.
 - The system clipboard is deliberately **not** merged with `"` — lesson 03
   explains the tradeoff and how to flip it (`:set clipboard=unnamed`).
 
@@ -202,6 +247,19 @@ Neovim/after for Vim — your file always wins):
   prints this for you if it detects the deficiency.
 - `nvim-treesitter` builds parsers at install time, so have a C compiler
   (`gcc`/`clang`) around on Neovim — the polyglot path on Vim needs none.
+
+### The editor's own tutorial (`:TutorClassic`) with this config
+
+The stock interactive tutorial (Neovim's `vim-01`/`vim-02` lessons, Vim 9's
+`:Tutor`) works under this config, with these differences:
+
+| Stock lesson | Difference here | To follow it exactly |
+|---|---|---|
+| any | `:Tutor` opens these lessons instead | `:TutorClassic` |
+| 6.5 (set option) | `ignorecase smartcase` is already on, so `/ignore` already finds `Ignore`/`IGNORE` before `:set ic`; `hlsearch incsearch` are on too | `:set noic` first |
+| 7.2 (completion) | `wildmode=longest:full,full`: the first `<Tab>` completes the common prefix, the second opens the menu | `:set wildmode=full` |
+| 2.1.5 (clipboard) | none: the clipboard is deliberately not merged with `"` (lesson 03) | — |
+| insert mode (not taught) | with coc installed, `<Tab>`/`<S-Tab>` accept/step coc's menu and `<C-Space>` opens it | — |
 
 ## Troubleshooting
 

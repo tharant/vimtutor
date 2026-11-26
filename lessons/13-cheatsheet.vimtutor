@@ -52,15 +52,17 @@
 
   COMPLETION AND LSP (coc.nvim)                          (Lesson 12)
   ~ Ctrl-Space Ctrl-N Ctrl-P Tab Ctrl-y Ctrl-e
-  ~ K  gd  gr  gy  gi  Ctrl-O     ]d [d :CocList diagnostics
+  ~ K  gd  gr  gy  gi  Ctrl-O     ]g [g :CocList diagnostics
   ~ <Leader>rn <Leader>ac <Leader>qf    :CocList outline :CocCommand
   ~ :CocConfig :CocInfo :CocRestart :CocInstall :CocList extensions
+  ~ Scala 3: setup.sh --with-scala   :!scala-cli setup-ide .  :CocRestart
 
   WHERE THINGS LIVE
   ~ ~/.vimrc / ~/.config/nvim/init.vim    your init file (one source line)
   ~ ~/.local/share/vimtutor/              this tutor: lessons + shared config
   ~ config/vimrc.common                   the actual shared configuration
   ~ plugged/                              vim-plug clones
+  ~ scala/bin/                            cs, metals, scala-cli (--with-scala)
   ~ stdpath('data')/coc/extensions        coc extensions
 
   Back to the TOC:  :Tutor      Next lesson:  :Tutor 0  for the index.
